@@ -11,8 +11,8 @@ namespace CsgTest
         private BspSolid _solid;
         private Mesh _mesh;
 
-        public Transform cutTransform;
-        
+        public List<Transform> CutTransforms;
+
         void OnEnable()
         {
             _solid?.Dispose();
@@ -25,6 +25,8 @@ namespace CsgTest
                     hideFlags = HideFlags.DontSave
                 };
 
+                _mesh.MarkDynamic();
+
                 GetComponent<MeshFilter>().sharedMesh = _mesh;
             }
         }
@@ -35,7 +37,7 @@ namespace CsgTest
             _solid = null;
         }
 
-        void OnDrawGizmos()
+        void Update()
         {
             if (_solid == null) return;
 
@@ -51,12 +53,24 @@ namespace CsgTest
             _solid.Cut(new BspPlane(new float3(0f, -1f, 0f), max));
             _solid.Cut(new BspPlane(new float3(0f, 0f, -1f), max));
 
-            if (cutTransform != null)
+            if (CutTransforms != null)
             {
-                _solid.Cut(new BspPlane(cutTransform.forward, cutTransform.position));
+                var normTransform = transform.worldToLocalMatrix.inverse.transpose;
+
+                foreach (var cutTransform in CutTransforms)
+                {
+                    if (cutTransform == null) continue;
+
+                    var forward = cutTransform.forward;
+
+                    var normal = (Vector3) (normTransform * new Vector4(forward.x, forward.y, forward.z, 0f));
+                    var position = transform.InverseTransformPoint(cutTransform.position);
+
+                    _solid.Cut(new BspPlane(normal, position));
+                }
             }
 
-            _solid.WriteToMesh(null);
+            _solid.WriteToMesh(_mesh);
         }
     }
 }

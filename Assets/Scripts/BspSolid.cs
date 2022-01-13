@@ -92,11 +92,6 @@ namespace CsgTest
             return mesh;
         }
 
-        public BspSolid()
-        {
-
-        }
-
         public void Clear()
         {
             _nodeCount = 0;
@@ -184,14 +179,39 @@ namespace CsgTest
             // TODO
         }
 
+        [ThreadStatic]
+        private static List<Vector3> _sMeshVertices;
+
+        [ThreadStatic]
+        private static List<Vector3> _sMeshNormals;
+
+        [ThreadStatic]
+        private static List<int> _sMeshIndices;
+
         public void WriteToMesh(Mesh mesh)
         {
             mesh?.Clear();
 
+            var vertices = _sMeshVertices ?? (_sMeshVertices = new List<Vector3>());
+            var normals = _sMeshNormals ?? (_sMeshNormals = new List<Vector3>());
+            var indices = _sMeshIndices ?? (_sMeshIndices = new List<int>());
+
+            vertices.Clear();
+            normals.Clear();
+            indices.Clear();
+
             for (ushort i = 0; i < _nodeCount; ++i)
             {
-                TriangulateFace(i);
+                TriangulateFace(vertices, normals, indices, i);
             }
+
+            mesh?.SetVertices(vertices);
+            mesh?.SetNormals(normals);
+            mesh?.SetTriangles(indices, 0);
+
+            mesh?.UploadMeshData(false);
+
+            mesh?.MarkModified();
         }
 
         private static float3 GetTangent(float3 normal)
@@ -242,8 +262,6 @@ namespace CsgTest
 
             var t = math.dot(cutPlane.Normal * cutPlane.Offset - origin, cutPlane.Normal) / denom;
             cuts.Add(new FaceCut(cutNormal2, t));
-
-            Gizmos.DrawLine(origin, origin + cutNormal * t);
         }
 
         private static float Cross(float2 a, float2 b)
@@ -251,7 +269,10 @@ namespace CsgTest
             return a.x * b.y - a.y * b.x;
         }
 
-        private void TriangulateFace(ushort index)
+        [ThreadStatic]
+        private static List<FaceCut> _sFaceCuts;
+
+        private void TriangulateFace(List<Vector3> vertices, List<Vector3> normals, List<int> indices, ushort index)
         {
             var node = _nodes[index];
             var plane = _planes[node.PlaneIndex];
@@ -259,10 +280,12 @@ namespace CsgTest
             var tu = math.normalizesafe(GetTangent(plane.Normal));
             var tv = math.normalizesafe(math.cross(tu, plane.Normal));
 
-            var cuts = new List<FaceCut>();
+            var cuts = _sFaceCuts ?? (_sFaceCuts = new List<FaceCut>());
             var origin = plane.Normal * plane.Offset;
 
-            Gizmos.color = new Color(0.25f, 0.75f, 1f, 0.5f);
+            var normal = plane.Normal * (node.PositiveIndex == BspNode.InIndex ? 1f : -1f);
+
+            cuts.Clear();
 
             if (node.ParentIndex != index)
             {
@@ -302,59 +325,53 @@ namespace CsgTest
 
             cuts.Sort();
 
-            Gizmos.color = index == 6 ? Color.green : Color.red;
-
-            var verts = new List<float2>();
+            var firstIndex = vertices.Count;
 
             for (var i = 0; i < cuts.Count; ++i)
             {
                 var cutA = cuts[i];
-                var cutB = cuts[(i + 1) % cuts.Count];
-
-                var cross = Cross(cutA.Normal, cutB.Normal);
-
-                if (math.abs(cross) <= 0.0001f)
-                {
-                    return;
-                }
-
                 var p0 = cutA.Normal * cutA.Distance;
-                var p1 = cutB.Normal * cutB.Distance;
 
-                var along = math.dot(p1 - p0, cutB.Normal) / cross;
-                var vert = p0 + new float2(-cutA.Normal.y, cutA.Normal.x) * along;
+                var min = float.NegativeInfinity;
+                var max = float.PositiveInfinity;
 
-                var inside = true;
-
-                for (var j = 2; j < cuts.Count; ++j)
+                for (var j = 1; j < cuts.Count; ++j)
                 {
-                    var otherCut = cuts[(i + j) % cuts.Count];
+                    var cutB = cuts[(i + j) % cuts.Count];
+                    var cross = Cross(cutA.Normal, cutB.Normal);
 
-                    if (math.dot(otherCut.Normal, vert) < otherCut.Distance - 0.0001f)
+                    if (math.abs(cross) <= 0.0001f)
                     {
-                        Gizmos.DrawSphere(origin + vert.x * tu + vert.y * tv, 0.01f);
+                        continue;
+                    }
 
-                        inside = false;
-                        break;
+                    var p1 = cutB.Normal * cutB.Distance;
+
+                    var along = math.dot(p1 - p0, cutB.Normal) / cross;
+
+                    if (cross > 0f)
+                    {
+                        min = math.max(min, along);
+                    }
+                    else
+                    {
+                        max = math.min(max, along);
                     }
                 }
 
-                if (inside)
-                {
-                    verts.Add(vert);
-                }
+                if (max < min) continue;
+
+                var vert = p0 + new float2(-cutA.Normal.y, cutA.Normal.x) * max;
+
+                vertices.Add(origin + vert.x * tu + vert.y * tv);
+                normals.Add(normal);
             }
 
-            if (verts.Count < 3) return;
-
-            Gizmos.color = Color.white;
-
-            for (var i = 0; i < verts.Count; ++i)
+            for (var i = firstIndex + 2; i < vertices.Count; ++i)
             {
-                var a = verts[i];
-                var b = verts[(i + 1) % verts.Count];
-
-                Gizmos.DrawLine(origin + a.x * tu * 0.99f + a.y * tv * 0.99f, origin + b.x * tu * 0.99f + b.y * tv * 0.99f);
+                indices.Add(firstIndex);
+                indices.Add(i - 1);
+                indices.Add(i);
             }
         }
 
