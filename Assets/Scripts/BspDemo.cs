@@ -9,14 +9,19 @@ namespace CsgTest
     public class BspDemo : MonoBehaviour
     {
         private BspSolid _solid;
+        private BspSolid _cube;
         private Mesh _mesh;
 
         public List<Transform> CutTransforms;
+        public Transform UnionCubeTransform;
 
         void OnEnable()
         {
             _solid?.Dispose();
+            _cube?.Dispose();
+
             _solid = new BspSolid();
+            _cube = BspSolid.CreateCube(float3.zero, new float3(1f, 1f, 1f));
 
             if (_mesh == null)
             {
@@ -35,23 +40,22 @@ namespace CsgTest
         {
             _solid?.Dispose();
             _solid = null;
+
+            _cube?.Dispose();
+            _cube = null;
         }
 
         void Update()
         {
             if (_solid == null) return;
 
-            var min = new float3(-0.5f, -0.5f, -0.5f);
-            var max = new float3(0.5f, 0.5f, 0.5f);
-
             _solid.Clear();
+            _solid.Union(_cube, float4x4.identity);
 
-            _solid.Cut(new BspPlane(new float3(1f, 0f, 0f), min));
-            _solid.Cut(new BspPlane(new float3(0f, 1f, 0f), min));
-            _solid.Cut(new BspPlane(new float3(0f, 0f, 1f), min));
-            _solid.Cut(new BspPlane(new float3(-1f, 0f, 0f), max));
-            _solid.Cut(new BspPlane(new float3(0f, -1f, 0f), max));
-            _solid.Cut(new BspPlane(new float3(0f, 0f, -1f), max));
+            if (UnionCubeTransform != null)
+            {
+                _solid.Union(_cube, transform.worldToLocalMatrix * UnionCubeTransform.localToWorldMatrix);
+            }
 
             if (CutTransforms != null)
             {
