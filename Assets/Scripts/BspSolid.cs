@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using Codice.CM.Client.Differences;
 using Unity.Collections;
 using UnityEngine;
@@ -9,6 +10,18 @@ using Unity.Mathematics;
 
 namespace CsgTest
 {
+    [Flags]
+    public enum CsgOperator
+    {
+        Source = 0b1100,
+        Target = 0b1010,
+
+        Or = Source | Target,
+        And = Source & Target,
+        Xor = Source ^ Target,
+        Subtract = Target & ~Source
+    }
+
     public readonly struct BspPlane : IEquatable<BspPlane>
     {
         public static BspPlane operator -(BspPlane plane)
@@ -92,12 +105,12 @@ namespace CsgTest
             return new BspNode(PlaneIndex, ParentIndex, NegativeIndex, value);
         }
 
-        public BspNode WithOffset(ushort rootParentIndex, int nodeIndexOffset, int planeIndexOffset)
+        public BspNode Inserted(ushort rootParentIndex, int nodeIndexOffset, int planeIndexOffset, ushort outValue, ushort inValue)
         {
             return new BspNode((ushort) (PlaneIndex + planeIndexOffset),
                 ParentIndex == NullParentIndex ? rootParentIndex : (ushort) (ParentIndex + nodeIndexOffset),
-                IsLeafIndex(NegativeIndex) ? NegativeIndex : (ushort)(NegativeIndex + nodeIndexOffset),
-                IsLeafIndex(PositiveIndex) ? PositiveIndex : (ushort)(PositiveIndex + nodeIndexOffset));
+                IsLeafIndex(NegativeIndex) ? NegativeIndex == OutIndex ? outValue : inValue : (ushort)(NegativeIndex + nodeIndexOffset),
+                IsLeafIndex(PositiveIndex) ? PositiveIndex == OutIndex ? outValue : inValue : (ushort)(PositiveIndex + nodeIndexOffset));
         }
 
         private static string ParentToString(ushort parentIndex)
@@ -220,17 +233,21 @@ namespace CsgTest
 
                 _nodes[i] = node;
             }
+
+            Reduce();
         }
 
-        private ushort InsertSubtree(NativeArray<BspNode> nodes, int count, ushort parentIndex, int planeIndexOffset)
+        private ushort InsertSubtree(NativeArray<BspNode> nodes, int count, ushort parentIndex, int planeIndexOffset, ushort outValue, ushort inValue)
         {
+            if (outValue == inValue) return outValue;
+
             var nodeIndexOffset = _nodeCount;
 
             Resize(ref _nodes, _nodeCount + count);
 
             for (var i = 0; i < count; ++i)
             {
-                _nodes[nodeIndexOffset + i] = nodes[i].WithOffset(parentIndex, nodeIndexOffset, planeIndexOffset);
+                _nodes[nodeIndexOffset + i] = nodes[i].Inserted(parentIndex, nodeIndexOffset, planeIndexOffset, outValue, inValue);
             }
 
             _nodeCount += count;
@@ -238,7 +255,16 @@ namespace CsgTest
             return (ushort)nodeIndexOffset;
         }
 
-        public void Union(BspSolid solid, float4x4 transform)
+        private static (ushort outValue, ushort inValue) GetLeafValues(CsgOperator op, bool parentLeafIn)
+        {
+            var outKey = parentLeafIn ? 1 : 0;
+            var inKey = outKey | 2;
+
+            return ((((int) op >> outKey) & 1) == 0 ? BspNode.OutIndex : BspNode.InIndex,
+                (((int)op >> inKey) & 1) == 0 ? BspNode.OutIndex : BspNode.InIndex);
+        }
+
+        public void Combine(BspSolid solid, CsgOperator op, float4x4? transform = null)
         {
             var planeIndexOffset = _planeCount;
 
@@ -248,16 +274,20 @@ namespace CsgTest
 
             _planeCount += solid._planeCount;
 
-            var normalTransform = math.transpose(math.inverse(transform));
-
-            for (var i = planeIndexOffset; i < _planeCount; ++i)
+            if (transform != null)
             {
-                _planes[i] = _planes[i].Transform(transform, normalTransform);
+                var normalTransform = math.transpose(math.inverse(transform.Value));
+
+                for (var i = planeIndexOffset; i < _planeCount; ++i)
+                {
+                    _planes[i] = _planes[i].Transform(transform.Value, normalTransform);
+                }
             }
 
             if (_nodeCount == 0)
             {
-                InsertSubtree(solid._nodes, solid._nodeCount, BspNode.NullParentIndex, planeIndexOffset);
+                var (outValue, inValue) = GetLeafValues(op, false);
+                InsertSubtree(solid._nodes, solid._nodeCount, BspNode.NullParentIndex, planeIndexOffset, outValue, inValue);
                 return;
             }
 
@@ -267,18 +297,22 @@ namespace CsgTest
             {
                 var node = _nodes[i];
 
-                if (node.NegativeIndex == BspNode.OutIndex)
+                if (BspNode.IsLeafIndex(node.NegativeIndex))
                 {
-                    node = node.WithNegativeIndex(InsertSubtree(solid._nodes, solid._nodeCount, i, planeIndexOffset));
+                    var (outValue, inValue) = GetLeafValues(op, node.NegativeIndex == BspNode.InIndex);
+                    node = node.WithNegativeIndex(InsertSubtree(solid._nodes, solid._nodeCount, i, planeIndexOffset, outValue, inValue));
                 }
 
-                if (node.PositiveIndex == BspNode.OutIndex)
+                if (BspNode.IsLeafIndex(node.PositiveIndex))
                 {
-                    node = node.WithPositiveIndex(InsertSubtree(solid._nodes, solid._nodeCount, i, planeIndexOffset));
+                    var (outValue, inValue) = GetLeafValues(op, node.PositiveIndex == BspNode.InIndex);
+                    node = node.WithPositiveIndex(InsertSubtree(solid._nodes, solid._nodeCount, i, planeIndexOffset, outValue, inValue));
                 }
 
                 _nodes[i] = node;
             }
+
+            Reduce();
         }
 
         public void Transform(float4x4 matrix)
@@ -313,6 +347,7 @@ namespace CsgTest
             var normals = _sMeshNormals ?? (_sMeshNormals = new List<Vector3>());
             var indices = _sMeshIndices ?? (_sMeshIndices = new List<int>());
 
+            var pathSet = new HashSet<uint>();
             var paths = new Queue<uint>();
 
             vertices.Clear();
@@ -322,11 +357,17 @@ namespace CsgTest
             for (ushort i = 0; i < _nodeCount; ++i)
             {
                 paths.Clear();
+                pathSet.Clear();
+
                 paths.Enqueue(0u);
 
                 while (paths.Count > 0)
                 {
-                    TriangulateFace(paths, vertices, normals, indices, i, paths.Dequeue());
+                    var path = paths.Dequeue();
+
+                    if (!pathSet.Add(path)) continue;
+
+                    TriangulateFace(paths, vertices, normals, indices, i, path);
                 }
             }
 
@@ -351,13 +392,16 @@ namespace CsgTest
                     : new float3(0f, 0f, 1f));
         }
 
-        private readonly struct FaceCut : IComparable<FaceCut>
+        private struct FaceCut : IComparable<FaceCut>
         {
             public readonly float2 Normal;
             public readonly float Angle;
             public readonly float Distance;
 
-            public FaceCut(float2 normal, float distance) => (Normal, Angle, Distance) = (normal, math.atan2(normal.y, normal.x), distance);
+            public float Min;
+            public float Max;
+
+            public FaceCut(float2 normal, float distance, float min, float max) => (Normal, Angle, Distance, Min, Max) = (normal, math.atan2(normal.y, normal.x), distance, min, max);
 
             public int CompareTo(FaceCut other)
             {
@@ -365,17 +409,14 @@ namespace CsgTest
             }
         }
 
-        private void AddCut(List<FaceCut> cuts, BspPlane plane, BspNode cutNode, bool positive, float3 origin, float3 tu, float3 tv)
+        private bool AddCut(List<FaceCut> cuts, BspPlane plane, BspPlane cutPlane, float3 origin, float3 tu, float3 tv)
         {
-            var cutPlane = _planes[cutNode.PlaneIndex];
-
-            if (!positive)
-            {
-                // cutPlane = -cutPlane;
-            }
-
             var cutTangent = math.cross(plane.Normal, cutPlane.Normal);
-            if (math.lengthsq(cutTangent) <= 0.0000001f) return;
+
+            if (math.lengthsq(cutTangent) <= 0.0000001f)
+            {
+                return plane.Offset * math.dot(plane.Normal, cutPlane.Normal) - cutPlane.Offset > 0.0001f;
+            }
 
             var cutNormal = math.cross(cutTangent, plane.Normal);
 
@@ -388,10 +429,83 @@ namespace CsgTest
             cutNormal2 = math.normalizesafe(cutNormal2);
 
             var denom = math.dot(cutPlane.Normal, cutNormal);
-            if (math.abs(denom) <= 0.0001f) return;
+
+            if (math.abs(denom) <= 0.0001f) return true;
 
             var t = math.dot(cutPlane.Normal * cutPlane.Offset - origin, cutPlane.Normal) / denom;
-            cuts.Add(new FaceCut(cutNormal2, t));
+            var p0 = cutNormal2 * t;
+
+            var min = float.NegativeInfinity;
+            var max = float.PositiveInfinity;
+
+            var removedAny = false;
+
+            for (var i = cuts.Count - 1; i >= 0; --i)
+            {
+                var other = cuts[i];
+                var cross = Cross(cutNormal2, other.Normal);
+
+                if (math.abs(cross) <= 0.0001f)
+                {
+                    var dot = math.dot(cutNormal2, other.Normal);
+
+                    if (other.Distance * dot < t)
+                    {
+                        if (t * dot < other.Distance)
+                        {
+                            return false;
+                        }
+
+                        other.Min = float.PositiveInfinity;
+                        other.Max = float.NegativeInfinity;
+
+                        cuts.RemoveAt(i);
+                        removedAny = true;
+                    }
+                    else if (t * dot < other.Distance)
+                    {
+                        min = float.PositiveInfinity;
+                        max = float.NegativeInfinity;
+                        break;
+                    }
+
+                    continue;
+                }
+
+                var p1 = other.Normal * other.Distance;
+
+                if (cross > 0f)
+                {
+                    min = math.max(min, math.dot(p1 - p0, other.Normal) / cross);
+                    other.Max = math.min(other.Max, math.dot(p0 - p1, cutNormal2) / -cross);
+                }
+                else
+                {
+                    max = math.min(max, math.dot(p1 - p0, other.Normal) / cross);
+                    other.Min = math.max(other.Min, math.dot(p0 - p1, cutNormal2) / -cross);
+                }
+
+                if (other.Max > other.Min)
+                {
+                    cuts[i] = other;
+                }
+                else
+                {
+                    cuts.RemoveAt(i);
+                    removedAny = true;
+                }
+            }
+
+            if (max > min)
+            {
+                cuts.Add(new FaceCut(cutNormal2, t, min, max));
+            }
+            else
+            {
+                return !removedAny;
+            }
+
+            return true;
         }
 
         private static float Cross(float2 a, float2 b)
@@ -401,14 +515,20 @@ namespace CsgTest
 
         [ThreadStatic]
         private static List<FaceCut> _sFaceCuts;
-
-        private void HandleChildCuts(Queue<uint> paths, List<FaceCut> cuts, BspPlane plane, float3 origin, float3 tu, float3 tv, BspNode child, uint path, ref int pathIndex)
+        
+        private (bool, ushort) HandleChildCuts(Queue<uint> paths, List<FaceCut> cuts, BspPlane plane, float3 origin, float3 tu, float3 tv, BspNode child, uint path, ref int pathIndex)
         {
             while (true)
             {
                 bool positive;
 
-                if (!BspNode.IsLeafIndex(child.NegativeIndex) && !BspNode.IsLeafIndex(child.PositiveIndex))
+                var childPlane = _planes[child.PlaneIndex];
+
+                if (math.lengthsq(math.cross(childPlane.Normal, plane.Normal)) <= 0.0001f)
+                {
+                    positive = math.dot(childPlane.Normal, plane.Normal) * plane.Offset >= childPlane.Offset;
+                }
+                else
                 {
                     positive = ((path >> pathIndex) & 1) == 1;
 
@@ -418,17 +538,19 @@ namespace CsgTest
                     }
 
                     ++pathIndex;
-                }
-                else
-                {
-                    positive = !BspNode.IsLeafIndex(child.PositiveIndex);
-                }
 
-                AddCut(cuts, plane, child, positive, origin, tu, tv);
+                    if (!AddCut(cuts, plane, positive ? childPlane : -childPlane, origin, tu, tv))
+                    {
+                        return (false, default);
+                    }
+                }
 
                 var nextIndex = positive ? child.PositiveIndex : child.NegativeIndex;
 
-                if (BspNode.IsLeafIndex(nextIndex)) break;
+                if (BspNode.IsLeafIndex(nextIndex))
+                {
+                    return (true, nextIndex);
+                }
 
                 child = _nodes[nextIndex];
             }
@@ -437,6 +559,9 @@ namespace CsgTest
         private void TriangulateFace(Queue<uint> paths, List<Vector3> vertices, List<Vector3> normals, List<int> indices, ushort index, uint path)
         {
             var node = _nodes[index];
+
+            if (node.NegativeIndex == node.PositiveIndex && BspNode.IsLeafIndex(node.NegativeIndex)) return;
+
             var plane = _planes[node.PlaneIndex];
 
             var tu = math.normalizesafe(GetTangent(plane.Normal));
@@ -455,23 +580,48 @@ namespace CsgTest
             while (parent.ParentIndex != BspNode.NullParentIndex)
             {
                 var curIndex = parent.ParentIndex;
-                parent = _nodes[parent.ParentIndex];
+                parent = _nodes[curIndex];
 
-                AddCut(cuts, plane, parent, parent.PositiveIndex == prevIndex, origin, tu, tv);
+                var cutPlane = _planes[parent.PlaneIndex];
+
+                if (!AddCut(cuts, plane, parent.PositiveIndex == prevIndex ? cutPlane : -cutPlane, origin, tu, tv)) return;
 
                 prevIndex = curIndex;
             }
 
             var pathIndex = 0;
+            var negativeLeaf = node.NegativeIndex;
+            var positiveLeaf = node.PositiveIndex;
 
-            if (!BspNode.IsLeafIndex(node.NegativeIndex))
+            bool valid;
+
+            if (!BspNode.IsLeafIndex(negativeLeaf))
             {
-                HandleChildCuts(paths, cuts, plane, origin, tu, tv, _nodes[node.NegativeIndex], path, ref pathIndex);
+                (valid, negativeLeaf) = HandleChildCuts(paths, cuts, plane, origin, tu, tv, _nodes[negativeLeaf], path, ref pathIndex);
+                if (!valid) return;
             }
 
-            if (!BspNode.IsLeafIndex(node.PositiveIndex))
+            if (!BspNode.IsLeafIndex(positiveLeaf))
             {
-                HandleChildCuts(paths, cuts, plane, origin, tu, tv, _nodes[node.PositiveIndex], path, ref pathIndex);
+                (valid, positiveLeaf) = HandleChildCuts(paths, cuts, plane, origin, tu, tv, _nodes[positiveLeaf], path, ref pathIndex);
+                if (!valid) return;
+            }
+
+            if (negativeLeaf == positiveLeaf) return;
+
+            for (var i = cuts.Count - 1; i >= 0; --i)
+            {
+                var cut = cuts[i];
+
+                if (float.IsNegativeInfinity(cut.Min) || float.IsPositiveInfinity(cut.Max))
+                {
+                    return;
+                }
+
+                if (cut.Max <= cut.Min)
+                {
+                    cuts.RemoveAt(i);
+                }
             }
 
             if (cuts.Count < 3) return;
@@ -480,57 +630,39 @@ namespace CsgTest
 
             var firstIndex = vertices.Count;
 
+            if (negativeLeaf == BspNode.InIndex)
+            {
+                normal = -normal;
+            }
+
             for (var i = 0; i < cuts.Count; ++i)
             {
-                var cutA = cuts[i];
-                var p0 = cutA.Normal * cutA.Distance;
+                var cut = cuts[i];
+                var p0 = cut.Normal * cut.Distance;
 
-                var min = float.NegativeInfinity;
-                var max = float.PositiveInfinity;
-
-                for (var j = 1; j < cuts.Count; ++j)
-                {
-                    var cutB = cuts[(i + j) % cuts.Count];
-                    var cross = Cross(cutA.Normal, cutB.Normal);
-
-                    if (math.abs(cross) <= 0.0001f)
-                    {
-                        if (cutA.Distance * math.dot(cutA.Normal, cutB.Normal) < cutB.Distance)
-                        {
-                            min = float.PositiveInfinity;
-                            max = float.NegativeInfinity;
-                        }
-
-                        continue;
-                    }
-
-                    var p1 = cutB.Normal * cutB.Distance;
-
-                    var along = math.dot(p1 - p0, cutB.Normal) / cross;
-
-                    if (cross > 0f)
-                    {
-                        min = math.max(min, along);
-                    }
-                    else
-                    {
-                        max = math.min(max, along);
-                    }
-                }
-
-                if (max < min) continue;
-
-                var vert = p0 + new float2(-cutA.Normal.y, cutA.Normal.x) * max;
+                var vert = p0 + new float2(-cut.Normal.y, cut.Normal.x) * cut.Max;
 
                 vertices.Add(origin + vert.x * tu + vert.y * tv);
                 normals.Add(normal);
             }
 
-            for (var i = firstIndex + 2; i < vertices.Count; ++i)
+            if (negativeLeaf == BspNode.InIndex)
             {
-                indices.Add(firstIndex);
-                indices.Add(i - 1);
-                indices.Add(i);
+                for (var i = firstIndex + 2; i < vertices.Count; ++i)
+                {
+                    indices.Add(firstIndex);
+                    indices.Add(i);
+                    indices.Add(i - 1);
+                }
+            }
+            else
+            {
+                for (var i = firstIndex + 2; i < vertices.Count; ++i)
+                {
+                    indices.Add(firstIndex);
+                    indices.Add(i - 1);
+                    indices.Add(i);
+                }
             }
 
             return;

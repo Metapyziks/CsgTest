@@ -15,6 +15,8 @@ namespace CsgTest
         public List<Transform> CutTransforms;
         public Transform UnionCubeTransform;
 
+        public CsgOperator Operator = CsgOperator.Or;
+
         void OnEnable()
         {
             _solid?.Dispose();
@@ -50,11 +52,11 @@ namespace CsgTest
             if (_solid == null) return;
 
             _solid.Clear();
-            _solid.Union(_cube, float4x4.identity);
+            _solid.Combine(_cube, CsgOperator.Or);
 
             if (UnionCubeTransform != null)
             {
-                _solid.Union(_cube, transform.worldToLocalMatrix * UnionCubeTransform.localToWorldMatrix);
+                _solid.Combine(_cube, Operator, transform.worldToLocalMatrix * UnionCubeTransform.localToWorldMatrix);
             }
 
             if (CutTransforms != null)
