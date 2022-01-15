@@ -10,7 +10,6 @@ using Unity.Mathematics;
 
 namespace CsgTest
 {
-    [Flags]
     public enum CsgOperator
     {
         Source = 0b1100,
@@ -354,6 +353,8 @@ namespace CsgTest
             normals.Clear();
             indices.Clear();
 
+            var writer = new StringWriter();
+
             for (ushort i = 0; i < _nodeCount; ++i)
             {
                 paths.Clear();
@@ -361,15 +362,21 @@ namespace CsgTest
 
                 paths.Enqueue(0u);
 
+                writer.WriteLine(i);
+
                 while (paths.Count > 0)
                 {
                     var path = paths.Dequeue();
 
                     if (!pathSet.Add(path)) continue;
 
+                    writer.WriteLine($"  {Convert.ToString(path, 2)}");
+
                     TriangulateFace(paths, vertices, normals, indices, i, path);
                 }
             }
+
+            Debug.Log(writer);
 
             mesh?.SetVertices(vertices);
             mesh?.SetNormals(normals);
@@ -394,12 +401,26 @@ namespace CsgTest
 
         private struct FaceCut : IComparable<FaceCut>
         {
+            public static FaceCut ExcludeAll => new FaceCut(new float2(-1f, 0f),
+                float.PositiveInfinity, float.NegativeInfinity, float.PositiveInfinity);
+
+            public static FaceCut ExcludeNone => new FaceCut(new float2(1f, 0f),
+                float.NegativeInfinity, float.NegativeInfinity, float.PositiveInfinity);
+
+            public static FaceCut operator -(FaceCut cut)
+            {
+                return new FaceCut(-cut.Normal, -cut.Distance, -cut.Max, -cut.Min);
+            }
+
             public readonly float2 Normal;
             public readonly float Angle;
             public readonly float Distance;
 
             public float Min;
             public float Max;
+
+            public bool ExcludesAll => float.IsPositiveInfinity(Distance);
+            public bool ExcludesNone => float.IsNegativeInfinity(Distance);
 
             public FaceCut(float2 normal, float distance, float min, float max) => (Normal, Angle, Distance, Min, Max) = (normal, math.atan2(normal.y, normal.x), distance, min, max);
 
@@ -409,13 +430,17 @@ namespace CsgTest
             }
         }
 
-        private bool AddCut(List<FaceCut> cuts, BspPlane plane, BspPlane cutPlane, float3 origin, float3 tu, float3 tv)
+        private FaceCut GetFaceCut(BspPlane plane, BspPlane cutPlane, float3 origin, float3 tu, float3 tv)
         {
             var cutTangent = math.cross(plane.Normal, cutPlane.Normal);
 
             if (math.lengthsq(cutTangent) <= 0.0000001f)
             {
-                return plane.Offset * math.dot(plane.Normal, cutPlane.Normal) - cutPlane.Offset > 0.0001f;
+                // If this cut completely excludes the original plane, return a FaceCut that also excludes everything
+
+                return plane.Offset * math.dot(plane.Normal, cutPlane.Normal) > cutPlane.Offset + 0.0001f
+                    ? FaceCut.ExcludeNone
+                    : FaceCut.ExcludeAll;
             }
 
             var cutNormal = math.cross(cutTangent, plane.Normal);
@@ -428,84 +453,160 @@ namespace CsgTest
 
             cutNormal2 = math.normalizesafe(cutNormal2);
 
-            var denom = math.dot(cutPlane.Normal, cutNormal);
+            var t = math.dot(cutPlane.Normal * cutPlane.Offset - origin, cutPlane.Normal)
+                    / math.dot(cutPlane.Normal, cutNormal);
 
-            if (math.abs(denom) <= 0.0001f) return true;
+            return new FaceCut(cutNormal2, t, float.NegativeInfinity, float.PositiveInfinity);
+        }
 
-            var t = math.dot(cutPlane.Normal * cutPlane.Offset - origin, cutPlane.Normal) / denom;
-            var p0 = cutNormal2 * t;
+        private (bool ExcludesNone, bool ExcludesAll) GetNewFaceCutExclusions(List<FaceCut> cuts, FaceCut cut)
+        {
+            if (cut.ExcludesAll)
+            {
+                return (false, true);
+            }
+
+            if (cut.ExcludesNone)
+            {
+                return (true, false);
+            }
+
+            var p0 = cut.Normal * cut.Distance;
 
             var min = float.NegativeInfinity;
             var max = float.PositiveInfinity;
 
-            var removedAny = false;
+            var anyIntersections = false;
+            var excludesNone = true;
+            var excludedCutCount = 0;
+
+            foreach (var other in cuts)
+            {
+                var cross = Cross(cut.Normal, other.Normal);
+
+                if (math.abs(cross) <= 0.0001f)
+                {
+                    var dot = math.dot(cut.Normal, other.Normal);
+
+                    if (other.Distance * dot < cut.Distance)
+                    {
+                        if (cut.Distance * dot < other.Distance)
+                        {
+                            return (false, true);
+                        }
+
+                        excludesNone = false;
+                    }
+
+                    if (cut.Distance * dot < other.Distance)
+                    {
+                        return (true, false);
+                    }
+
+                    continue;
+                }
+
+                anyIntersections = true;
+
+                var p1 = other.Normal * other.Distance;
+                var proj0 = math.dot(p1 - p0, other.Normal) / cross;
+                var proj1 = math.dot(p0 - p1, cut.Normal) / -cross;
+
+                if (cross > 0f)
+                {
+                    min = math.max(min, proj0);
+
+                    if (proj1 < other.Min)
+                    {
+                        excludesNone = false;
+                        ++excludedCutCount;
+                    }
+                    else if (proj1 < other.Max)
+                    {
+                        excludesNone = false;
+                    }
+                }
+                else
+                {
+                    max = math.min(max, proj0);
+
+                    if (proj1 > other.Max)
+                    {
+                        excludesNone = false;
+                        ++excludedCutCount;
+                    }
+                    else if (proj1 > other.Min)
+                    {
+                        excludesNone = false;
+                    }
+                }
+            }
+
+            return (anyIntersections && excludesNone, anyIntersections && excludedCutCount == cuts.Count);
+        }
+
+        private void AddFaceCut(List<FaceCut> cuts, FaceCut cut)
+        {
+            var p0 = cut.Normal * cut.Distance;
 
             for (var i = cuts.Count - 1; i >= 0; --i)
             {
                 var other = cuts[i];
-                var cross = Cross(cutNormal2, other.Normal);
+                var cross = Cross(cut.Normal, other.Normal);
 
                 if (math.abs(cross) <= 0.0001f)
                 {
-                    var dot = math.dot(cutNormal2, other.Normal);
+                    var dot = math.dot(cut.Normal, other.Normal);
 
-                    if (other.Distance * dot < t)
+                    if (other.Distance * dot < cut.Distance)
                     {
-                        if (t * dot < other.Distance)
+                        if (cut.Distance * dot < other.Distance)
                         {
-                            return false;
+                            throw new Exception();
                         }
 
-                        other.Min = float.PositiveInfinity;
-                        other.Max = float.NegativeInfinity;
-
                         cuts.RemoveAt(i);
-                        removedAny = true;
+                        continue;
                     }
-                    else if (t * dot < other.Distance)
+
+                    if (cut.Distance * dot < other.Distance)
                     {
-                        min = float.PositiveInfinity;
-                        max = float.NegativeInfinity;
-                        break;
+                        cut.Min = float.PositiveInfinity;
+                        cut.Max = float.NegativeInfinity;
                     }
 
                     continue;
                 }
 
                 var p1 = other.Normal * other.Distance;
+                var proj0 = math.dot(p1 - p0, other.Normal) / cross;
+                var proj1 = math.dot(p0 - p1, cut.Normal) / -cross;
 
                 if (cross > 0f)
                 {
-                    min = math.max(min, math.dot(p1 - p0, other.Normal) / cross);
-                    other.Max = math.min(other.Max, math.dot(p0 - p1, cutNormal2) / -cross);
+                    cut.Min = math.max(cut.Min, proj0);
+                    other.Max = math.min(other.Max, proj1);
                 }
                 else
                 {
-                    max = math.min(max, math.dot(p1 - p0, other.Normal) / cross);
-                    other.Min = math.max(other.Min, math.dot(p0 - p1, cutNormal2) / -cross);
+                    cut.Max = math.min(cut.Max, proj0);
+                    other.Min = math.max(other.Min, proj1);
                 }
 
-                if (other.Max > other.Min)
+                if (other.Min >= other.Max)
+                {
+                    cuts.RemoveAt(i);
+                }
+                else
                 {
                     cuts[i] = other;
                 }
-                else
-                {
-                    cuts.RemoveAt(i);
-                    removedAny = true;
-                }
             }
 
-            if (max > min)
+            if (cut.Min < cut.Max)
             {
-                cuts.Add(new FaceCut(cutNormal2, t, min, max));
+                cuts.Add(cut);
             }
-            else
-            {
-                return !removedAny;
-            }
-
-            return true;
         }
 
         private static float Cross(float2 a, float2 b)
@@ -523,12 +624,18 @@ namespace CsgTest
                 bool positive;
 
                 var childPlane = _planes[child.PlaneIndex];
+                var positiveCut = GetFaceCut(plane, childPlane, origin, tu, tv);
+                var negativeCut = -positiveCut;
 
-                if (math.lengthsq(math.cross(childPlane.Normal, plane.Normal)) <= 0.0001f)
+                var (negExcludesNone, negExcludesAll) = GetNewFaceCutExclusions(cuts, negativeCut);
+                var (posExcludesNone, posExcludesAll) = GetNewFaceCutExclusions(cuts, positiveCut);
+
+                if (negExcludesAll && posExcludesAll)
                 {
-                    positive = math.dot(childPlane.Normal, plane.Normal) * plane.Offset >= childPlane.Offset;
+                    return (false, default);
                 }
-                else
+
+                if (!negExcludesNone && !posExcludesNone && !negExcludesAll && !posExcludesAll)
                 {
                     positive = ((path >> pathIndex) & 1) == 1;
 
@@ -538,11 +645,15 @@ namespace CsgTest
                     }
 
                     ++pathIndex;
+                }
+                else
+                {
+                    positive = negExcludesAll;
+                }
 
-                    if (!AddCut(cuts, plane, positive ? childPlane : -childPlane, origin, tu, tv))
-                    {
-                        return (false, default);
-                    }
+                if (positive && !posExcludesNone || !positive && !negExcludesNone)
+                {
+                    AddFaceCut(cuts, positive ? positiveCut : negativeCut);
                 }
 
                 var nextIndex = positive ? child.PositiveIndex : child.NegativeIndex;
@@ -573,7 +684,7 @@ namespace CsgTest
             var normal = plane.Normal * (node.PositiveIndex == BspNode.InIndex ? 1f : -1f);
 
             cuts.Clear();
-            
+
             var parent = node;
             var prevIndex = index;
 
@@ -583,8 +694,11 @@ namespace CsgTest
                 parent = _nodes[curIndex];
 
                 var cutPlane = _planes[parent.PlaneIndex];
+                var faceCut = GetFaceCut(plane, parent.PositiveIndex == prevIndex ? cutPlane : -cutPlane, origin, tu, tv);
+                var (excludesNone, excludesAll) = GetNewFaceCutExclusions(cuts, faceCut);
 
-                if (!AddCut(cuts, plane, parent.PositiveIndex == prevIndex ? cutPlane : -cutPlane, origin, tu, tv)) return;
+                if (excludesAll) return;
+                if (!excludesNone) AddFaceCut(cuts, faceCut);
 
                 prevIndex = curIndex;
             }
@@ -624,7 +738,7 @@ namespace CsgTest
                 }
             }
 
-            if (cuts.Count < 3) return;
+            if (cuts.Count == 0) return;
 
             cuts.Sort();
 
@@ -664,8 +778,6 @@ namespace CsgTest
                     indices.Add(i);
                 }
             }
-
-            return;
         }
 
         public void Dispose()
