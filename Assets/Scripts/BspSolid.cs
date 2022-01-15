@@ -693,8 +693,6 @@ namespace CsgTest
             var cuts = _sFaceCuts ?? (_sFaceCuts = new List<FaceCut>());
             var origin = plane.Normal * plane.Offset;
 
-            var normal = plane.Normal * (node.PositiveIndex == BspNode.InIndex ? 1f : -1f);
-
             cuts.Clear();
 
             var parent = node;
@@ -756,10 +754,7 @@ namespace CsgTest
 
             var firstIndex = vertices.Count;
 
-            if (negativeLeaf == BspNode.InIndex)
-            {
-                normal = -normal;
-            }
+            var normal = plane.Normal * (positiveLeaf == BspNode.InIndex ? -1f : 1f);
 
             for (var i = 0; i < cuts.Count; ++i)
             {
