@@ -10,7 +10,7 @@ namespace CsgTest
 
         void Update()
         {
-            transform.localRotation = Quaternion.Euler(0f, Speed * Time.deltaTime, 0f) * transform.localRotation;
+            transform.Rotate(Vector3.up, Speed * Time.deltaTime);
         }
     }
 }

@@ -354,8 +354,6 @@ namespace CsgTest
             pathSet.Clear();
             paths.Clear();
 
-            //var writer = new StringWriter();
-
             for (ushort i = 0; i < _nodeCount; ++i)
             {
                 paths.Clear();
@@ -363,21 +361,15 @@ namespace CsgTest
 
                 paths.Enqueue(0u);
 
-                //writer.WriteLine(i);
-
                 while (paths.Count > 0)
                 {
                     var path = paths.Dequeue();
 
                     if (!pathSet.Add(path)) continue;
-
-                    var vertCount = TriangulateFace(paths, vertices, normals, indices, i, path);
-
-                    //writer.WriteLine($"  {Convert.ToString(path, 2)}: {vertCount}");
+                    
+                    TriangulateFace(paths, vertices, normals, indices, i, path);
                 }
             }
-
-            //Debug.Log(writer);
 
             mesh?.SetVertices(vertices);
             mesh?.SetNormals(normals);
@@ -402,6 +394,8 @@ namespace CsgTest
 
         private struct FaceCut : IComparable<FaceCut>, IEquatable<FaceCut>
         {
+            public static Comparison<FaceCut> Comparer { get; } = (x, y) => Math.Sign(x.Angle - y.Angle);
+
             public static FaceCut ExcludeAll => new FaceCut(new float2(-1f, 0f),
                 float.PositiveInfinity, float.NegativeInfinity, float.PositiveInfinity);
 
@@ -750,7 +744,7 @@ namespace CsgTest
 
             if (cuts.Count == 0) return 0;
 
-            cuts.Sort();
+            cuts.Sort(FaceCut.Comparer);
 
             var firstIndex = vertices.Count;
 
