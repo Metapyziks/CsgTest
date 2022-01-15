@@ -329,14 +329,12 @@ namespace CsgTest
             // TODO
         }
 
-        [ThreadStatic]
-        private static List<Vector3> _sMeshVertices;
+        [ThreadStatic] private static List<Vector3> _sMeshVertices;
+        [ThreadStatic] private static List<Vector3> _sMeshNormals;
+        [ThreadStatic] private static List<int> _sMeshIndices;
 
-        [ThreadStatic]
-        private static List<Vector3> _sMeshNormals;
-
-        [ThreadStatic]
-        private static List<int> _sMeshIndices;
+        [ThreadStatic] private static HashSet<uint> _sPathSet;
+        [ThreadStatic] private static Queue<uint> _sPathQueue;
 
         public void WriteToMesh(Mesh mesh)
         {
@@ -346,14 +344,17 @@ namespace CsgTest
             var normals = _sMeshNormals ?? (_sMeshNormals = new List<Vector3>());
             var indices = _sMeshIndices ?? (_sMeshIndices = new List<int>());
 
-            var pathSet = new HashSet<uint>();
-            var paths = new Queue<uint>();
+            var pathSet = _sPathSet ?? (_sPathSet = new HashSet<uint>());
+            var paths = _sPathQueue ?? (_sPathQueue = new Queue<uint>());
 
             vertices.Clear();
             normals.Clear();
             indices.Clear();
 
-            var writer = new StringWriter();
+            pathSet.Clear();
+            paths.Clear();
+
+            //var writer = new StringWriter();
 
             for (ushort i = 0; i < _nodeCount; ++i)
             {
@@ -362,7 +363,7 @@ namespace CsgTest
 
                 paths.Enqueue(0u);
 
-                writer.WriteLine(i);
+                //writer.WriteLine(i);
 
                 while (paths.Count > 0)
                 {
@@ -370,13 +371,13 @@ namespace CsgTest
 
                     if (!pathSet.Add(path)) continue;
 
-                    writer.WriteLine($"  {Convert.ToString(path, 2)}");
+                    var vertCount = TriangulateFace(paths, vertices, normals, indices, i, path);
 
-                    TriangulateFace(paths, vertices, normals, indices, i, path);
+                    //writer.WriteLine($"  {Convert.ToString(path, 2)}: {vertCount}");
                 }
             }
 
-            Debug.Log(writer);
+            //Debug.Log(writer);
 
             mesh?.SetVertices(vertices);
             mesh?.SetNormals(normals);
@@ -399,7 +400,7 @@ namespace CsgTest
                     : new float3(0f, 0f, 1f));
         }
 
-        private struct FaceCut : IComparable<FaceCut>
+        private struct FaceCut : IComparable<FaceCut>, IEquatable<FaceCut>
         {
             public static FaceCut ExcludeAll => new FaceCut(new float2(-1f, 0f),
                 float.PositiveInfinity, float.NegativeInfinity, float.PositiveInfinity);
@@ -427,6 +428,29 @@ namespace CsgTest
             public int CompareTo(FaceCut other)
             {
                 return Angle.CompareTo(other.Angle);
+            }
+
+            public override string ToString()
+            {
+                return $"{{ Normal: {Normal}, Distance: {Distance} }}";
+            }
+
+            public bool Equals(FaceCut other)
+            {
+                return Normal.Equals(other.Normal) && Distance.Equals(other.Distance);
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is FaceCut other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    return (Normal.GetHashCode() * 397) ^ Distance.GetHashCode();
+                }
             }
         }
 
@@ -471,22 +495,26 @@ namespace CsgTest
                 return (true, false);
             }
 
-            var p0 = cut.Normal * cut.Distance;
-
-            var min = float.NegativeInfinity;
-            var max = float.PositiveInfinity;
-
             var anyIntersections = false;
-            var excludesNone = true;
+            var excludesAny = false;
             var excludedCutCount = 0;
 
             foreach (var other in cuts)
             {
                 var cross = Cross(cut.Normal, other.Normal);
+                var dot = math.dot(cut.Normal, other.Normal);
 
                 if (math.abs(cross) <= 0.0001f)
                 {
-                    var dot = math.dot(cut.Normal, other.Normal);
+                    if (cut.Equals(other))
+                    {
+                        return (true, false);
+                    }
+
+                    if (cut.Equals(-other))
+                    {
+                        return (false, true);
+                    }
 
                     if (other.Distance * dot < cut.Distance)
                     {
@@ -495,7 +523,8 @@ namespace CsgTest
                             return (false, true);
                         }
 
-                        excludesNone = false;
+                        excludesAny = true;
+                        ++excludedCutCount;
                     }
 
                     if (cut.Distance * dot < other.Distance)
@@ -508,56 +537,41 @@ namespace CsgTest
 
                 anyIntersections = true;
 
-                var p1 = other.Normal * other.Distance;
-                var proj0 = math.dot(p1 - p0, other.Normal) / cross;
-                var proj1 = math.dot(p0 - p1, cut.Normal) / -cross;
+                var proj1 = (cut.Distance - other.Distance * dot) / -cross;
 
-                if (cross > 0f)
+                if (cross > 0f && proj1 < other.Max)
                 {
-                    min = math.max(min, proj0);
+                    excludesAny = true;
 
                     if (proj1 < other.Min)
                     {
-                        excludesNone = false;
                         ++excludedCutCount;
                     }
-                    else if (proj1 < other.Max)
-                    {
-                        excludesNone = false;
-                    }
                 }
-                else
+                else if (cross < 0f && proj1 > other.Min)
                 {
-                    max = math.min(max, proj0);
+                    excludesAny = true;
 
                     if (proj1 > other.Max)
                     {
-                        excludesNone = false;
                         ++excludedCutCount;
-                    }
-                    else if (proj1 > other.Min)
-                    {
-                        excludesNone = false;
                     }
                 }
             }
 
-            return (anyIntersections && excludesNone, anyIntersections && excludedCutCount == cuts.Count);
+            return (anyIntersections && !excludesAny, anyIntersections && excludedCutCount == cuts.Count);
         }
 
         private void AddFaceCut(List<FaceCut> cuts, FaceCut cut)
         {
-            var p0 = cut.Normal * cut.Distance;
-
             for (var i = cuts.Count - 1; i >= 0; --i)
             {
                 var other = cuts[i];
                 var cross = Cross(cut.Normal, other.Normal);
+                var dot = math.dot(cut.Normal, other.Normal);
 
                 if (math.abs(cross) <= 0.0001f)
                 {
-                    var dot = math.dot(cut.Normal, other.Normal);
-
                     if (other.Distance * dot < cut.Distance)
                     {
                         if (cut.Distance * dot < other.Distance)
@@ -578,9 +592,8 @@ namespace CsgTest
                     continue;
                 }
 
-                var p1 = other.Normal * other.Distance;
-                var proj0 = math.dot(p1 - p0, other.Normal) / cross;
-                var proj1 = math.dot(p0 - p1, cut.Normal) / -cross;
+                var proj0 = (other.Distance - cut.Distance * dot) / cross;
+                var proj1 = (cut.Distance - other.Distance * dot) / -cross;
 
                 if (cross > 0f)
                 {
@@ -627,15 +640,14 @@ namespace CsgTest
                 var positiveCut = GetFaceCut(plane, childPlane, origin, tu, tv);
                 var negativeCut = -positiveCut;
 
-                var (negExcludesNone, negExcludesAll) = GetNewFaceCutExclusions(cuts, negativeCut);
-                var (posExcludesNone, posExcludesAll) = GetNewFaceCutExclusions(cuts, positiveCut);
+                var (negExcludesAll, posExcludesAll) = GetNewFaceCutExclusions(cuts, positiveCut);
 
                 if (negExcludesAll && posExcludesAll)
                 {
                     return (false, default);
                 }
 
-                if (!negExcludesNone && !posExcludesNone && !negExcludesAll && !posExcludesAll)
+                if (!negExcludesAll && !posExcludesAll)
                 {
                     positive = ((path >> pathIndex) & 1) == 1;
 
@@ -651,7 +663,7 @@ namespace CsgTest
                     positive = negExcludesAll;
                 }
 
-                if (positive && !posExcludesNone || !positive && !negExcludesNone)
+                if (positive && !negExcludesAll || !positive && !posExcludesAll)
                 {
                     AddFaceCut(cuts, positive ? positiveCut : negativeCut);
                 }
@@ -667,11 +679,11 @@ namespace CsgTest
             }
         }
 
-        private void TriangulateFace(Queue<uint> paths, List<Vector3> vertices, List<Vector3> normals, List<int> indices, ushort index, uint path)
+        private int TriangulateFace(Queue<uint> paths, List<Vector3> vertices, List<Vector3> normals, List<int> indices, ushort index, uint path)
         {
             var node = _nodes[index];
 
-            if (node.NegativeIndex == node.PositiveIndex && BspNode.IsLeafIndex(node.NegativeIndex)) return;
+            if (node.NegativeIndex == node.PositiveIndex && BspNode.IsLeafIndex(node.NegativeIndex)) return 0;
 
             var plane = _planes[node.PlaneIndex];
 
@@ -697,7 +709,7 @@ namespace CsgTest
                 var faceCut = GetFaceCut(plane, parent.PositiveIndex == prevIndex ? cutPlane : -cutPlane, origin, tu, tv);
                 var (excludesNone, excludesAll) = GetNewFaceCutExclusions(cuts, faceCut);
 
-                if (excludesAll) return;
+                if (excludesAll) return 0;
                 if (!excludesNone) AddFaceCut(cuts, faceCut);
 
                 prevIndex = curIndex;
@@ -712,16 +724,16 @@ namespace CsgTest
             if (!BspNode.IsLeafIndex(negativeLeaf))
             {
                 (valid, negativeLeaf) = HandleChildCuts(paths, cuts, plane, origin, tu, tv, _nodes[negativeLeaf], path, ref pathIndex);
-                if (!valid) return;
+                if (!valid) return 0;
             }
 
             if (!BspNode.IsLeafIndex(positiveLeaf))
             {
                 (valid, positiveLeaf) = HandleChildCuts(paths, cuts, plane, origin, tu, tv, _nodes[positiveLeaf], path, ref pathIndex);
-                if (!valid) return;
+                if (!valid) return 0;
             }
 
-            if (negativeLeaf == positiveLeaf) return;
+            if (negativeLeaf == positiveLeaf) return 0;
 
             for (var i = cuts.Count - 1; i >= 0; --i)
             {
@@ -729,7 +741,7 @@ namespace CsgTest
 
                 if (float.IsNegativeInfinity(cut.Min) || float.IsPositiveInfinity(cut.Max))
                 {
-                    return;
+                    return 0;
                 }
 
                 if (cut.Max <= cut.Min)
@@ -738,7 +750,7 @@ namespace CsgTest
                 }
             }
 
-            if (cuts.Count == 0) return;
+            if (cuts.Count == 0) return 0;
 
             cuts.Sort();
 
@@ -778,6 +790,8 @@ namespace CsgTest
                     indices.Add(i);
                 }
             }
+
+            return vertices.Count - firstIndex;
         }
 
         public void Dispose()
