@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Codice.CM.Client.Differences;
 using Unity.Collections;
 using UnityEngine;
@@ -110,6 +111,14 @@ namespace CsgTest
                 ParentIndex == NullParentIndex ? rootParentIndex : (ushort) (ParentIndex + nodeIndexOffset),
                 IsLeafIndex(NegativeIndex) ? NegativeIndex == OutIndex ? outValue : inValue : (ushort)(NegativeIndex + nodeIndexOffset),
                 IsLeafIndex(PositiveIndex) ? PositiveIndex == OutIndex ? outValue : inValue : (ushort)(PositiveIndex + nodeIndexOffset));
+        }
+
+        public BspNode Remapped(ushort planeIndex, NativeArray<ushort> nodeRemapDict)
+        {
+            return new BspNode(planeIndex,
+                ParentIndex == NullParentIndex ? NullParentIndex : nodeRemapDict[ParentIndex],
+                IsLeafIndex(NegativeIndex) ? NegativeIndex : nodeRemapDict[NegativeIndex],
+                IsLeafIndex(PositiveIndex) ? PositiveIndex : nodeRemapDict[PositiveIndex]);
         }
 
         private static string ParentToString(ushort parentIndex)
@@ -324,17 +333,152 @@ namespace CsgTest
             }
         }
 
+        [ThreadStatic] private static HashSet<uint> _sPathSet;
+        [ThreadStatic] private static Queue<uint> _sPathQueue;
+
+        [ThreadStatic] private static Dictionary<BspPlane, ushort> _sPlaneRemapDict;
+        [ThreadStatic] private static List<BspNode> _sNewNodes;
+
         public void Reduce()
         {
-            // TODO
+            var pathSet = _sPathSet ?? (_sPathSet = new HashSet<uint>());
+            var paths = _sPathQueue ?? (_sPathQueue = new Queue<uint>());
+
+            var newNodes = _sNewNodes ?? (_sNewNodes = new List<BspNode>());
+
+            newNodes.Clear();
+
+            // Maps original node indices to either OUT, IN, or (newNodeCount - index)
+
+            var nodeRemapDict = new NativeArray<ushort>(_nodeCount, Allocator.Temp);
+            var anyRemoved = false;
+
+            for (var i = _nodeCount - 1; i >= 0; --i)
+            {
+                paths.Clear();
+                pathSet.Clear();
+
+                paths.Enqueue(0u);
+
+                TriangulationStats stats = default;
+
+                while (paths.Count > 0)
+                {
+                    var path = paths.Dequeue();
+
+                    if (!pathSet.Add(path)) continue;
+
+                    stats += TriangulateFace(paths, (ushort) i, path);
+                }
+
+                ushort replaceWith;
+                var node = _nodes[i];
+
+                if (!BspNode.IsLeafIndex(node.NegativeIndex) && node.NegativeIndex <= i || !BspNode.IsLeafIndex(node.PositiveIndex) && node.PositiveIndex <= i)
+                {
+                    throw new Exception("Child nodes must always have a greater index than their parents.");
+                }
+
+                var kept = false;
+
+                if (!stats.PositiveOut && !stats.PositiveIn && (stats.NegativeOut || stats.NegativeIn))
+                {
+                    // Only negative side exists
+                    replaceWith = stats.NegativeOut && stats.NegativeIn ? nodeRemapDict[node.NegativeIndex] : stats.NegativeOut ? BspNode.OutIndex : BspNode.InIndex;
+                }
+                else if (!stats.NegativeOut && !stats.NegativeIn && (stats.PositiveOut || stats.PositiveIn))
+                {
+                    // Only positive side exists
+                    replaceWith = stats.PositiveOut && stats.PositiveIn ? nodeRemapDict[node.PositiveIndex] : stats.PositiveOut ? BspNode.OutIndex : BspNode.InIndex;
+                }
+                else if (stats.NegativeOut && stats.PositiveOut && !stats.NegativeIn && !stats.PositiveIn)
+                {
+                    // Both sides are OUT
+                    replaceWith = BspNode.OutIndex;
+                }
+                else if (stats.NegativeIn && stats.PositiveIn && !stats.NegativeOut && !stats.PositiveOut)
+                {
+                    // Both sides are IN
+                    replaceWith = BspNode.InIndex;
+                }
+                else if (!stats.NegativeOut && !stats.NegativeIn && !stats.PositiveOut && !stats.PositiveIn)
+                {
+                    // Neither side exists
+                    replaceWith = BspNode.OutIndex;
+                }
+                else
+                {
+                    // Both sides exist, and are different
+                    // Note that since we are iterating backwards, these indices will also be backwards
+
+                    if (stats.NegativeOut != stats.NegativeIn)
+                    {
+                        node = node.WithNegativeIndex(stats.NegativeOut ? BspNode.OutIndex : BspNode.InIndex);
+                    }
+
+                    if (stats.PositiveOut != stats.PositiveIn)
+                    {
+                        node = node.WithPositiveIndex(stats.PositiveOut ? BspNode.OutIndex : BspNode.InIndex);
+                    }
+
+                    newNodes.Add(node);
+                    kept = true;
+
+                    replaceWith = (ushort)newNodes.Count;
+                }
+
+                nodeRemapDict[i] = replaceWith;
+
+                anyRemoved |= !kept;
+            }
+
+            // Reverse indices in node remap dictionary to actually match where they'll be in _nodes
+            for (var i = 0; i < _nodeCount; ++i)
+            {
+                var remappedIndex = nodeRemapDict[i];
+
+                if (!BspNode.IsLeafIndex(remappedIndex))
+                {
+                    nodeRemapDict[i] = (ushort)(newNodes.Count - remappedIndex);
+                }
+
+#if DEBUG
+                _nodes[i] = default;
+#endif
+            }
+
+            var planeRemapDict = _sPlaneRemapDict ?? (_sPlaneRemapDict = new Dictionary<BspPlane, ushort>());
+
+            planeRemapDict.Clear();
+
+            for (var i = 0; i < newNodes.Count; ++i)
+            {
+                var oldNode = newNodes[newNodes.Count - i - 1];
+                var plane = _planes[oldNode.PlaneIndex];
+
+                if (!planeRemapDict.TryGetValue(plane, out var newPlaneIndex))
+                {
+                    planeRemapDict.Add(plane, newPlaneIndex = (ushort)planeRemapDict.Count);
+                }
+
+                _nodes[i] = oldNode.Remapped(newPlaneIndex, nodeRemapDict);
+            }
+
+            _nodeCount = newNodes.Count;
+
+            foreach (var pair in planeRemapDict)
+            {
+                _planes[pair.Value] = pair.Key;
+            }
+
+            _planeCount = planeRemapDict.Count;
+
+            nodeRemapDict.Dispose();
         }
 
         [ThreadStatic] private static List<Vector3> _sMeshVertices;
         [ThreadStatic] private static List<Vector3> _sMeshNormals;
         [ThreadStatic] private static List<int> _sMeshIndices;
-
-        [ThreadStatic] private static HashSet<uint> _sPathSet;
-        [ThreadStatic] private static Queue<uint> _sPathQueue;
 
         public void WriteToMesh(Mesh mesh)
         {
@@ -366,7 +510,7 @@ namespace CsgTest
                     var path = paths.Dequeue();
 
                     if (!pathSet.Add(path)) continue;
-                    
+
                     TriangulateFace(paths, vertices, normals, indices, i, path);
                 }
             }
@@ -673,11 +817,45 @@ namespace CsgTest
             }
         }
 
-        private int TriangulateFace(Queue<uint> paths, List<Vector3> vertices, List<Vector3> normals, List<int> indices, ushort index, uint path)
+        private struct TriangulationStats
+        {
+            public static TriangulationStats operator +(TriangulationStats a, TriangulationStats b)
+            {
+                return new TriangulationStats
+                {
+                    VertexCount = a.VertexCount + b.VertexCount,
+
+                    NegativeOut = a.NegativeOut | b.NegativeOut,
+                    NegativeIn = a.NegativeIn | b.NegativeIn,
+                    PositiveOut = a.PositiveOut | b.PositiveOut,
+                    PositiveIn = a.PositiveIn | b.PositiveIn
+                };
+            }
+
+            public int VertexCount;
+
+            public bool NegativeOut;
+            public bool NegativeIn;
+            public bool PositiveOut;
+            public bool PositiveIn;
+
+            public override string ToString()
+            {
+                return
+                    $"{{ VertexCount: {VertexCount}, NegativeOut: {NegativeOut}, NegativeIn: {NegativeIn}, PositiveOut: {PositiveOut}, PositiveIn: {PositiveIn} }}";
+            }
+        }
+        
+        private TriangulationStats TriangulateFace(Queue<uint> paths, ushort index, uint path)
+        {
+            return TriangulateFace(paths, null, null, null, index, path);
+        }
+
+        private TriangulationStats TriangulateFace(Queue<uint> paths, List<Vector3> vertices, List<Vector3> normals, List<int> indices, ushort index, uint path)
         {
             var node = _nodes[index];
 
-            if (node.NegativeIndex == node.PositiveIndex && BspNode.IsLeafIndex(node.NegativeIndex)) return 0;
+            if (node.NegativeIndex == node.PositiveIndex && BspNode.IsLeafIndex(node.NegativeIndex)) return default;
 
             var plane = _planes[node.PlaneIndex];
 
@@ -701,7 +879,7 @@ namespace CsgTest
                 var faceCut = GetFaceCut(plane, parent.PositiveIndex == prevIndex ? cutPlane : -cutPlane, origin, tu, tv);
                 var (excludesNone, excludesAll) = GetNewFaceCutExclusions(cuts, faceCut);
 
-                if (excludesAll) return 0;
+                if (excludesAll) return default;
                 if (!excludesNone) AddFaceCut(cuts, faceCut);
 
                 prevIndex = curIndex;
@@ -716,16 +894,36 @@ namespace CsgTest
             if (!BspNode.IsLeafIndex(negativeLeaf))
             {
                 (valid, negativeLeaf) = HandleChildCuts(paths, cuts, plane, origin, tu, tv, _nodes[negativeLeaf], path, ref pathIndex);
-                if (!valid) return 0;
+                if (!valid) return default;
             }
 
             if (!BspNode.IsLeafIndex(positiveLeaf))
             {
                 (valid, positiveLeaf) = HandleChildCuts(paths, cuts, plane, origin, tu, tv, _nodes[positiveLeaf], path, ref pathIndex);
-                if (!valid) return 0;
+                if (!valid) return default;
             }
 
-            if (negativeLeaf == positiveLeaf) return 0;
+            TriangulationStats stats = default;
+
+            if (negativeLeaf == BspNode.OutIndex)
+            {
+                stats.NegativeOut = true;
+            }
+            else
+            {
+                stats.NegativeIn = true;
+            }
+
+            if (positiveLeaf == BspNode.OutIndex)
+            {
+                stats.PositiveOut = true;
+            }
+            else
+            {
+                stats.PositiveIn = true;
+            }
+
+            if (negativeLeaf == positiveLeaf) return stats;
 
             for (var i = cuts.Count - 1; i >= 0; --i)
             {
@@ -733,7 +931,7 @@ namespace CsgTest
 
                 if (float.IsNegativeInfinity(cut.Min) || float.IsPositiveInfinity(cut.Max))
                 {
-                    return 0;
+                    return stats;
                 }
 
                 if (cut.Max <= cut.Min)
@@ -742,8 +940,10 @@ namespace CsgTest
                 }
             }
 
-            if (cuts.Count == 0) return 0;
+            stats.VertexCount = cuts.Count;
 
+            if (cuts.Count == 0 || vertices == null || indices == null) return stats;
+            
             cuts.Sort(FaceCut.Comparer);
 
             var firstIndex = vertices.Count;
@@ -758,7 +958,7 @@ namespace CsgTest
                 var vert = p0 + new float2(-cut.Normal.y, cut.Normal.x) * cut.Max;
 
                 vertices.Add(origin + vert.x * tu + vert.y * tv);
-                normals.Add(normal);
+                normals?.Add(normal);
             }
 
             if (negativeLeaf == BspNode.InIndex)
@@ -780,7 +980,7 @@ namespace CsgTest
                 }
             }
 
-            return vertices.Count - firstIndex;
+            return stats;
         }
 
         public void Dispose()
