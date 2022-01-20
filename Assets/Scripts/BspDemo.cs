@@ -10,6 +10,7 @@ namespace CsgTest
     {
         private BspSolid _solid;
         private BspSolid _cube;
+        private BspSolid _dodecahedron;
         private Mesh _mesh;
 
         public List<Transform> CutTransforms;
@@ -23,7 +24,8 @@ namespace CsgTest
             _cube?.Dispose();
 
             _solid = new BspSolid();
-            _cube = BspSolid.CreateCube(float3.zero, new float3(1f, 1f, 1f));
+            _cube = BspSolid.CreateBox(float3.zero, new float3(1f, 1f, 1f));
+            _dodecahedron = BspSolid.CreateDodecahedron(float3.zero, 0.5f);
 
             if (_mesh == null)
             {
@@ -45,6 +47,9 @@ namespace CsgTest
 
             _cube?.Dispose();
             _cube = null;
+
+            _dodecahedron?.Dispose();
+            _dodecahedron = null;
         }
 
         void Update()
@@ -52,11 +57,11 @@ namespace CsgTest
             if (_solid == null) return;
 
             _solid.Clear();
-            _solid.Combine(_cube, CsgOperator.Or);
+            _solid.Merge(_dodecahedron, CsgOperator.Or);
 
             if (UnionCubeTransform != null)
             {
-                _solid.Combine(_cube, Operator, transform.worldToLocalMatrix * UnionCubeTransform.localToWorldMatrix);
+                _solid.Merge(_cube, Operator, transform.worldToLocalMatrix * UnionCubeTransform.localToWorldMatrix);
             }
 
             if (CutTransforms != null)
