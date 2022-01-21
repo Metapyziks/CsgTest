@@ -64,14 +64,16 @@ namespace CsgTest
             _cube = null;
         }
 
-        void OnValidate()
-        {
-            _geometryInvalid = true;
-        }
-
         void Update()
         {
             if (_solid == null) return;
+
+#if UNITY_EDITOR
+            if (!UnityEditor.EditorApplication.isPlaying)
+            {
+                _geometryInvalid = true;
+            }
+#endif
 
             if (_geometryInvalid)
             {
