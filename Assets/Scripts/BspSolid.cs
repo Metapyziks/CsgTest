@@ -116,5 +116,65 @@ namespace CsgTest
 
             _nodeCount = 0;
         }
+
+        public override string ToString()
+        {
+            if (_nodeCount == 0)
+            {
+                return "Empty";
+            }
+
+            var writer = new StringWriter();
+
+            WriteNode(writer, _nodes[0], 0);
+
+            return writer.ToString();
+        }
+
+        private void WriteIndentation(StringWriter writer, int depth)
+        {
+            for (var i = 0; i < depth; ++i)
+            {
+                writer.Write("  ");
+            }
+        }
+
+        private void WriteNode(StringWriter writer, BspNode node, int depth)
+        {
+            var plane = _planes[node.PlaneIndex];
+            writer.WriteLine(plane);
+
+            WriteIndentation(writer, depth);
+            writer.Write("- ");
+
+            switch (node.NegativeIndex)
+            {
+                case BspNode.OutIndex:
+                    writer.WriteLine("OUT");
+                    break;
+                case BspNode.InIndex:
+                    writer.WriteLine("IN");
+                    break;
+                default:
+                    WriteNode(writer, _nodes[node.NegativeIndex], depth + 1);
+                    break;
+            }
+
+            WriteIndentation(writer, depth);
+            writer.Write("+ ");
+
+            switch (node.PositiveIndex)
+            {
+                case BspNode.OutIndex:
+                    writer.WriteLine("OUT");
+                    break;
+                case BspNode.InIndex:
+                    writer.WriteLine("IN");
+                    break;
+                default:
+                    WriteNode(writer, _nodes[node.PositiveIndex], depth + 1);
+                    break;
+            }
+        }
     }
 }

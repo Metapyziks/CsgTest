@@ -29,6 +29,27 @@ namespace CsgTest
         public bool ExcludesNone => float.IsNegativeInfinity(Distance);
 
         public FaceCut(float2 normal, float distance, float min, float max) => (Normal, Angle, Distance, Min, Max) = (normal, math.atan2(normal.y, normal.x), distance, min, max);
+        
+        public float3 GetPoint(float3 origin, float3 tu, float3 tv)
+        {
+            var minFinite = !float.IsNegativeInfinity(Min);
+            var maxFinite = !float.IsPositiveInfinity(Max);
+
+            return GetPoint(origin, tu, tv, minFinite && maxFinite
+                ? (Min + Max) * 0.5f
+                : minFinite
+                    ? Min + 1f
+                    : maxFinite
+                        ? Max - 1f
+                        : 0f);
+        }
+
+        public float3 GetPoint(float3 origin, float3 tu, float3 tv, float along)
+        {
+            var pos = Normal * Distance + new float2(-Normal.y, Normal.x) * math.clamp(along, -128f, 128f);
+
+            return origin + tu * pos.x + tv * pos.y;
+        }
 
         public int CompareTo(FaceCut other)
         {

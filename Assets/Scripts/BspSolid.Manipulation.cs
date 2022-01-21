@@ -1,6 +1,11 @@
 ﻿using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using Unity.Collections;
 using Unity.Mathematics;
+using UnityEngine;
 
 namespace CsgTest
 {
@@ -49,24 +54,6 @@ namespace CsgTest
             Reduce();
         }
 
-        private ushort InsertSubtree(NativeArray<BspNode> nodes, int count, ushort parentIndex, int planeIndexOffset, ushort outValue, ushort inValue)
-        {
-            if (outValue == inValue) return outValue;
-
-            var nodeIndexOffset = _nodeCount;
-
-            Helpers.EnsureCapacity(ref _nodes, _nodeCount + count);
-
-            for (var i = 0; i < count; ++i)
-            {
-                _nodes[nodeIndexOffset + i] = nodes[i].Inserted(parentIndex, nodeIndexOffset, planeIndexOffset, outValue, inValue);
-            }
-
-            _nodeCount += count;
-
-            return (ushort)nodeIndexOffset;
-        }
-
         private static (ushort rhsOutValue, ushort rhsInValue) GetLeafValues(CsgOperator op, bool lhsIn)
         {
             var outKey = lhsIn ? 1 : 0;
@@ -81,6 +68,16 @@ namespace CsgTest
             if (solid == this)
             {
                 throw new NotImplementedException();
+            }
+
+            if (solid._nodeCount == 0)
+            {
+                op &= CsgOperator.First;
+            }
+
+            if (_nodeCount == 0)
+            {
+                op &= CsgOperator.Second;
             }
 
             switch (op)
@@ -114,6 +111,12 @@ namespace CsgTest
                 }
             }
 
+            if (_nodeCount == 0)
+            {
+                // Should be already handled
+                throw new Exception();
+            }
+
             var planeIndexOffset = _planeCount;
 
             Helpers.EnsureCapacity(ref _planes, _planeCount + solid._planeCount);
@@ -132,35 +135,213 @@ namespace CsgTest
                 }
             }
 
-            if (_nodeCount == 0)
+            var planes = _sMergePlanes ?? (_sMergePlanes = new Stack<BspPlane>());
+
+            planes.Clear();
+
+            Merge(planes, 0, solid, op, planeIndexOffset);
+            
+            Reduce();
+        }
+
+        [ThreadStatic] private static Stack<BspPlane> _sMergePlanes;
+
+        private void Merge(Stack<BspPlane> planes, ushort nodeIndex, BspSolid solid, CsgOperator op, int planeIndexOffset)
+        {
+            var node = _nodes[nodeIndex];
+            var plane = _planes[node.PlaneIndex];
+
+            planes.Push(-plane);
+
+            if (BspNode.IsLeafIndex(node.NegativeIndex))
             {
-                var (outValue, inValue) = GetLeafValues(op, false);
-                InsertSubtree(solid._nodes, solid._nodeCount, BspNode.NullParentIndex, planeIndexOffset, outValue, inValue);
-                return;
+                var (outValue, inValue) = GetLeafValues(op, node.NegativeIndex == BspNode.InIndex);
+                node = node.WithNegativeIndex(InsertSubtree(planes, nodeIndex, solid._nodes, 0, planeIndexOffset, outValue, inValue));
+            }
+            else
+            {
+                Merge(planes, node.NegativeIndex, solid, op, planeIndexOffset);
             }
 
-            var oldNodeCount = _nodeCount;
+            planes.Pop();
+            planes.Push(plane);
 
-            for (ushort i = 0; i < oldNodeCount; ++i)
+            if (BspNode.IsLeafIndex(node.PositiveIndex))
             {
-                var node = _nodes[i];
+                var (outValue, inValue) = GetLeafValues(op, node.PositiveIndex == BspNode.InIndex);
+                node = node.WithPositiveIndex(InsertSubtree(planes, nodeIndex, solid._nodes, 0, planeIndexOffset, outValue, inValue));
+            }
+            else
+            {
+                Merge(planes, node.PositiveIndex, solid, op, planeIndexOffset);
+            }
 
+            planes.Pop();
+
+            _nodes[nodeIndex] = node;
+        }
+        
+        [ThreadStatic]
+        private static List<FaceCut> _sFaceCuts;
+
+        private float3 GetAnyPoint(List<FaceCut> cuts, float3 origin, float3 tu, float3 tv)
+        {
+            if (cuts.Count == 0)
+            {
+                return origin;
+            }
+
+            if (cuts.Count == 1)
+            {
+                return cuts[0].GetPoint(origin, tu, tv);
+            }
+
+            var point = float3.zero;
+
+            foreach (var cut in cuts)
+            {
+                point += cut.GetPoint(origin, tu, tv);
+            }
+
+            return point / cuts.Count;
+        }
+
+        private (bool ExcludesNegative, bool ExcludesPositive) GetPlaneExclusions(Stack<BspPlane> planes, BspPlane plane)
+        {
+            var faceCuts = _sFaceCuts ?? (_sFaceCuts = new List<FaceCut>());
+
+            faceCuts.Clear();
+
+            var (origin, tu, tv) = plane.GetBasis();
+
+            BspPlane excludingPlane = default;
+            var excluded = false;
+
+            foreach (var otherPlane in planes)
+            {
+                var cut = Helpers.GetFaceCut(plane, otherPlane, origin, tu, tv);
+                var (excludesNegative, excludesPositive) = faceCuts.GetNewFaceCutExclusions(cut);
+
+                if (excludesPositive)
+                {
+                    excluded = true;
+                    excludingPlane = otherPlane;
+                    break;
+                }
+
+                if (excludesNegative) continue;
+
+                faceCuts.AddFaceCut(cut);
+            }
+
+            //faceCuts.Sort(FaceCut.Comparer);
+
+            //foreach (var c in faceCuts)
+            //{
+            //    UnityEngine.Debug.DrawLine(c.GetPoint(origin, tu, tv, c.Min),
+            //        c.GetPoint(origin, tu, tv, c.Max), excluded ? Color.red : Color.blue);
+            //}
+
+            if (!excluded) return (false, false);
+
+            faceCuts.Clear();
+
+            (origin, tu, tv) = excludingPlane.GetBasis();
+
+            foreach (var otherPlane in planes)
+            {
+                if (otherPlane.Equals(excludingPlane))
+                {
+                    continue;
+                }
+
+                var cut = Helpers.GetFaceCut(excludingPlane, otherPlane, origin, tu, tv);
+                var (excludesNegative, excludesPositive) = faceCuts.GetNewFaceCutExclusions(cut);
+
+                if (excludesPositive)
+                {
+                    // TODO
+                    return (false, false);
+                }
+
+                if (excludesNegative) continue;
+
+                faceCuts.AddFaceCut(cut);
+            }
+
+            var insidePoint = GetAnyPoint(faceCuts, origin, tu, tv);
+
+            return math.dot(insidePoint, plane.Normal) > plane.Offset ? (true, false) : (false, true);
+        }
+
+        private ushort InsertSubtree(Stack<BspPlane> planes, ushort parentIndex, NativeArray<BspNode> nodes, int rootIndex, int planeIndexOffset, ushort outValue, ushort inValue)
+        {
+            if (outValue == inValue) return outValue;
+
+            var node = nodes[rootIndex];
+            var planeIndex = (ushort)(node.PlaneIndex + planeIndexOffset);
+            var plane = _planes[planeIndex];
+
+            var (excludesNegative, excludesPositive) = GetPlaneExclusions(planes, plane);
+
+            if (excludesNegative && excludesPositive)
+            {
+                throw new Exception();
+            }
+
+            if (excludesPositive)
+            {
                 if (BspNode.IsLeafIndex(node.NegativeIndex))
                 {
-                    var (outValue, inValue) = GetLeafValues(op, node.NegativeIndex == BspNode.InIndex);
-                    node = node.WithNegativeIndex(InsertSubtree(solid._nodes, solid._nodeCount, i, planeIndexOffset, outValue, inValue));
+                    return node.NegativeIndex == BspNode.OutIndex ? outValue : inValue;
                 }
 
-                if (BspNode.IsLeafIndex(node.PositiveIndex))
-                {
-                    var (outValue, inValue) = GetLeafValues(op, node.PositiveIndex == BspNode.InIndex);
-                    node = node.WithPositiveIndex(InsertSubtree(solid._nodes, solid._nodeCount, i, planeIndexOffset, outValue, inValue));
-                }
-
-                _nodes[i] = node;
+                return InsertSubtree(planes, parentIndex, nodes, node.NegativeIndex, planeIndexOffset, outValue, inValue);
             }
 
-            Reduce();
+            if (excludesNegative)
+            {
+                if (BspNode.IsLeafIndex(node.PositiveIndex))
+                {
+                    return node.PositiveIndex == BspNode.OutIndex ? outValue : inValue;
+                }
+
+                return InsertSubtree(planes, parentIndex, nodes, node.PositiveIndex, planeIndexOffset, outValue, inValue);
+            }
+
+            var newIndex = AddNode(planeIndex, parentIndex, outValue, outValue);
+            var newNode = _nodes[newIndex];
+
+            if (BspNode.IsLeafIndex(node.NegativeIndex))
+            {
+                newNode = newNode.WithNegativeIndex(node.NegativeIndex == BspNode.OutIndex ? outValue : inValue);
+            }
+            else
+            {
+                planes.Push(-plane);
+                newNode = newNode.WithNegativeIndex(InsertSubtree(planes, newIndex, nodes, node.NegativeIndex, planeIndexOffset, outValue, inValue));
+                planes.Pop();
+            }
+
+            if (BspNode.IsLeafIndex(node.PositiveIndex))
+            {
+                newNode = newNode.WithPositiveIndex(node.PositiveIndex == BspNode.OutIndex ? outValue : inValue);
+            }
+            else
+            {
+                planes.Push(plane);
+                newNode = newNode.WithPositiveIndex(InsertSubtree(planes, newIndex, nodes, node.PositiveIndex, planeIndexOffset, outValue, inValue));
+                planes.Pop();
+            }
+
+            if (BspNode.IsLeafIndex(newNode.NegativeIndex) && newNode.NegativeIndex == newNode.PositiveIndex)
+            {
+                return newNode.NegativeIndex;
+            }
+
+            _nodes[newIndex] = newNode;
+
+            return newIndex;
         }
     }
 }

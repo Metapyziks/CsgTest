@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -10,13 +8,15 @@ namespace CsgTest
     {
         private BspSolid _solid;
         private BspSolid _cube;
-        private BspSolid _dodecahedron;
+
         private Mesh _mesh;
+        private MeshCollider _collider;
 
-        public List<Transform> CutTransforms;
-        public Transform UnionCubeTransform;
+        // [Multiline(32)]
+        // public string value;
 
-        public CsgOperator Operator = CsgOperator.Or;
+        private bool _geometryInvalid;
+        private bool _meshInvalid;
 
         void OnEnable()
         {
@@ -25,7 +25,6 @@ namespace CsgTest
 
             _solid = new BspSolid();
             _cube = BspSolid.CreateBox(float3.zero, new float3(1f, 1f, 1f));
-            _dodecahedron = BspSolid.CreateDodecahedron(float3.zero, 0.5f);
 
             if (_mesh == null)
             {
@@ -37,7 +36,23 @@ namespace CsgTest
                 _mesh.MarkDynamic();
 
                 GetComponent<MeshFilter>().sharedMesh = _mesh;
+
+                _collider = GetComponent<MeshCollider>();
+
+                if (_collider != null)
+                {
+                    _collider.sharedMesh = _mesh;
+                }
             }
+
+            _geometryInvalid = true;
+        }
+
+        public void Subtract(float4x4 matrix)
+        {
+            _solid.Merge(_cube, CsgOperator.Subtract, matrix);
+
+            _meshInvalid = true;
         }
 
         void OnDisable()
@@ -47,41 +62,44 @@ namespace CsgTest
 
             _cube?.Dispose();
             _cube = null;
+        }
 
-            _dodecahedron?.Dispose();
-            _dodecahedron = null;
+        void OnValidate()
+        {
+            _geometryInvalid = true;
         }
 
         void Update()
         {
             if (_solid == null) return;
 
-            _solid.Clear();
-            _solid.Merge(_dodecahedron, CsgOperator.Or);
-
-            if (UnionCubeTransform != null)
+            if (_geometryInvalid)
             {
-                _solid.Merge(_cube, Operator, transform.worldToLocalMatrix * UnionCubeTransform.localToWorldMatrix);
+                _geometryInvalid = false;
+
+                _solid.Clear();
+
+                foreach (var brush in transform.GetComponentsInChildren<CsgBrush>())
+                {
+                    _solid.Merge(_cube, brush.Type == BrushType.Add ? CsgOperator.Or : CsgOperator.Subtract,
+                        brush.transform.localToWorldMatrix);
+                }
+
+                // value = _solid.ToString();
+
+                _meshInvalid = true;
             }
 
-            if (CutTransforms != null)
+            if (_meshInvalid)
             {
-                var normTransform = transform.worldToLocalMatrix.inverse.transpose;
+                _meshInvalid = false;
+                _solid.WriteToMesh(_mesh);
 
-                foreach (var cutTransform in CutTransforms)
+                if (_collider != null)
                 {
-                    if (cutTransform == null) continue;
-
-                    var forward = cutTransform.forward;
-
-                    var normal = (Vector3) (normTransform * new Vector4(forward.x, forward.y, forward.z, 0f));
-                    var position = transform.InverseTransformPoint(cutTransform.position);
-
-                    _solid.Cut(new BspPlane(normal, position));
+                    _collider.sharedMesh = _mesh;
                 }
             }
-
-            _solid.WriteToMesh(_mesh);
         }
     }
 }
