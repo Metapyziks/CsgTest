@@ -7,21 +7,36 @@ using UnityEngine;
 
 namespace CsgTest
 {
-    public enum BrushType
+    public enum BrushOperator
     {
         Add,
         Subtract
     }
 
+    public enum Primitive
+    {
+        Cube,
+        Dodecahedron
+    }
+
     public class CsgBrush : MonoBehaviour
     {
-        public BrushType Type;
+        public BrushOperator Operator;
+        public Primitive Primitive;
 
         private void OnDrawGizmos()
         {
             Gizmos.matrix = transform.localToWorldMatrix;
-            Gizmos.color = Type == BrushType.Add ? Color.blue : Color.yellow;
-            Gizmos.DrawWireCube(Vector3.zero, Vector3.one);
+            Gizmos.color = Operator == BrushOperator.Add ? Color.blue : Color.yellow;
+
+            if (Primitive == Primitive.Cube)
+            {
+                Gizmos.DrawWireCube(Vector3.zero, Vector3.one);
+            }
+            else
+            {
+                Gizmos.DrawWireSphere(Vector3.zero, 0.5f);
+            }
         }
     }
 }

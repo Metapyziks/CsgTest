@@ -8,12 +8,13 @@ namespace CsgTest
     {
         private BspSolid _solid;
         private BspSolid _cube;
+        private BspSolid _dodecahedron;
 
         private Mesh _mesh;
         private MeshCollider _collider;
 
-        // [Multiline(32)]
-        // public string value;
+        [Multiline(32)]
+        public string value;
 
         private bool _geometryInvalid;
         private bool _meshInvalid;
@@ -25,6 +26,7 @@ namespace CsgTest
 
             _solid = new BspSolid();
             _cube = BspSolid.CreateBox(float3.zero, new float3(1f, 1f, 1f));
+            _dodecahedron = BspSolid.CreateDodecahedron(float3.zero, 0.5f);
 
             if (_mesh == null)
             {
@@ -50,7 +52,7 @@ namespace CsgTest
 
         public void Subtract(float4x4 matrix)
         {
-            _solid.Merge(_cube, CsgOperator.Subtract, matrix);
+            _solid.Merge(_dodecahedron, CsgOperator.Subtract, matrix);
 
             _meshInvalid = true;
         }
@@ -62,6 +64,9 @@ namespace CsgTest
 
             _cube?.Dispose();
             _cube = null;
+
+            _dodecahedron?.Dispose();
+            _dodecahedron = null;
         }
 
         void Update()
@@ -83,11 +88,15 @@ namespace CsgTest
 
                 foreach (var brush in transform.GetComponentsInChildren<CsgBrush>())
                 {
-                    _solid.Merge(_cube, brush.Type == BrushType.Add ? CsgOperator.Or : CsgOperator.Subtract,
+                    _solid.Merge(
+                        brush.Primitive == Primitive.Cube ? _cube : _dodecahedron,
+                        brush.Operator == BrushOperator.Add ? CsgOperator.Or : CsgOperator.Subtract,
                         brush.transform.localToWorldMatrix);
                 }
 
-                // value = _solid.ToString();
+#if UNITY_EDITOR
+                value = _solid.ToString();
+#endif
 
                 _meshInvalid = true;
             }

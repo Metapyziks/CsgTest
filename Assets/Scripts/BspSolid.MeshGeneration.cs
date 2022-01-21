@@ -16,12 +16,15 @@ namespace CsgTest
             private readonly HashSet<uint> _pathSet = new HashSet<uint>();
             private readonly Queue<uint> _pathQueue = new Queue<uint>();
 
+            private readonly Stack<BspPlane> _planeStack = new Stack<BspPlane>();
+
             private readonly List<Vector3> _meshVertices = new List<Vector3>();
             private readonly List<Vector3> _meshNormals = new List<Vector3>();
             private readonly List<int> _meshIndices = new List<int>();
 
+            private readonly List<FaceCut> _nodeCuts = new List<FaceCut>();
             private readonly List<FaceCut> _faceCuts = new List<FaceCut>();
-            
+
             private NativeArray<BspNode> _nodes;
             private int _nodeCount;
 
@@ -42,22 +45,9 @@ namespace CsgTest
                 _planes = solid._planes;
                 _planeCount = solid._planeCount;
 
-                for (ushort i = 0; i < _nodeCount; ++i)
-                {
-                    _pathQueue.Clear();
-                    _pathSet.Clear();
+                _planeStack.Clear();
 
-                    _pathQueue.Enqueue(0u);
-
-                    while (_pathQueue.Count > 0)
-                    {
-                        var path = _pathQueue.Dequeue();
-
-                        if (!_pathSet.Add(path)) continue;
-
-                        TriangulateFace(i, path);
-                    }
-                }
+                TriangulateFaces(_planeStack, _nodes[0]);
 
                 _nodes = default;
                 _nodeCount = 0;
@@ -74,122 +64,151 @@ namespace CsgTest
                 mesh?.MarkModified();
             }
 
-            private TriangulationStats TriangulateFace(ushort index, uint path)
+            private TriangulationStats TriangulateFaces(Stack<BspPlane> planes, BspNode node)
             {
-                var node = _nodes[index];
-
                 if (node.NegativeIndex == node.PositiveIndex && BspNode.IsLeafIndex(node.NegativeIndex)) return default;
 
                 var plane = _planes[node.PlaneIndex];
+                var stats = TriangulateFace(planes, node);
+
+                if (!BspNode.IsLeafIndex(node.NegativeIndex))
+                {
+                    planes.Push(-plane);
+                    stats += TriangulateFaces(planes, _nodes[node.NegativeIndex]);
+                    planes.Pop();
+                }
+
+                if (!BspNode.IsLeafIndex(node.PositiveIndex))
+                {
+                    planes.Push(plane);
+                    stats += TriangulateFaces(planes, _nodes[node.PositiveIndex]);
+                    planes.Pop();
+                }
+
+                return stats;
+            }
+
+            private TriangulationStats TriangulateFace(Stack<BspPlane> planes, BspNode node)
+            {
+                var plane = _planes[node.PlaneIndex];
                 var (origin, tu, tv) = plane.GetBasis();
 
-                _faceCuts.Clear();
+                _nodeCuts.Clear();
 
-                var parent = node;
-                var prevIndex = index;
-
-                while (parent.ParentIndex != BspNode.NullParentIndex)
+                foreach (var cutPlane in planes)
                 {
-                    var curIndex = parent.ParentIndex;
-                    parent = _nodes[curIndex];
-
-                    var cutPlane = _planes[parent.PlaneIndex];
-                    var faceCut = Helpers.GetFaceCut(plane, parent.PositiveIndex == prevIndex ? cutPlane : -cutPlane, origin, tu, tv);
-                    var (excludesNone, excludesAll) = _faceCuts.GetNewFaceCutExclusions(faceCut);
+                    var faceCut = Helpers.GetFaceCut(plane, cutPlane, origin, tu, tv);
+                    var (excludesNone, excludesAll) = _nodeCuts.GetNewFaceCutExclusions(faceCut);
 
                     if (excludesAll) return default;
-                    if (!excludesNone) _faceCuts.AddFaceCut(faceCut);
-
-                    prevIndex = curIndex;
+                    if (!excludesNone) _nodeCuts.AddFaceCut(faceCut);
                 }
 
-                var pathIndex = 0;
-                var negativeLeaf = node.NegativeIndex;
-                var positiveLeaf = node.PositiveIndex;
+                _pathQueue.Clear();
+                _pathSet.Clear();
 
-                bool valid;
+                _pathQueue.Enqueue(0u);
 
-                if (!BspNode.IsLeafIndex(negativeLeaf))
+                var stats = default(TriangulationStats);
+
+                while (_pathQueue.Count > 0)
                 {
-                    (valid, negativeLeaf) = HandleChildCuts(plane, origin, tu, tv, _nodes[negativeLeaf], path, ref pathIndex);
-                    if (!valid) return default;
-                }
+                    var path = _pathQueue.Dequeue();
 
-                if (!BspNode.IsLeafIndex(positiveLeaf))
-                {
-                    (valid, positiveLeaf) = HandleChildCuts(plane, origin, tu, tv, _nodes[positiveLeaf], path, ref pathIndex);
-                    if (!valid) return default;
-                }
+                    if (!_pathSet.Add(path)) continue;
 
-                TriangulationStats stats = default;
+                    _faceCuts.Clear();
+                    _faceCuts.AddRange(_nodeCuts);
 
-                if (negativeLeaf == BspNode.OutIndex)
-                {
-                    stats.NegativeOut = true;
-                }
-                else
-                {
-                    stats.NegativeIn = true;
-                }
+                    var pathIndex = 0;
+                    var negativeLeaf = node.NegativeIndex;
+                    var positiveLeaf = node.PositiveIndex;
 
-                if (positiveLeaf == BspNode.OutIndex)
-                {
-                    stats.PositiveOut = true;
-                }
-                else
-                {
-                    stats.PositiveIn = true;
-                }
+                    bool valid;
 
-                if (negativeLeaf == positiveLeaf) return stats;
-
-                for (var i = _faceCuts.Count - 1; i >= 0; --i)
-                {
-                    var cut = _faceCuts[i];
-
-                    if (float.IsNegativeInfinity(cut.Min) || float.IsPositiveInfinity(cut.Max))
+                    if (!BspNode.IsLeafIndex(negativeLeaf))
                     {
-                        return stats;
+                        (valid, negativeLeaf) = HandleChildCuts(plane, origin, tu, tv, _nodes[negativeLeaf], path,
+                            ref pathIndex);
+                        if (!valid) continue;
                     }
 
-                    if (cut.Max <= cut.Min)
+                    if (!BspNode.IsLeafIndex(positiveLeaf))
                     {
-                        _faceCuts.RemoveAt(i);
+                        (valid, positiveLeaf) = HandleChildCuts(plane, origin, tu, tv, _nodes[positiveLeaf], path,
+                            ref pathIndex);
+                        if (!valid) continue;
                     }
-                }
 
-                stats.VertexCount = _faceCuts.Count;
-
-                if (_faceCuts.Count == 0) return stats;
-
-                _faceCuts.Sort(FaceCut.Comparer);
-
-                var firstIndex = _meshVertices.Count;
-
-                var normal = plane.Normal * (positiveLeaf == BspNode.InIndex ? -1f : 1f);
-
-                foreach (var cut in _faceCuts)
-                {
-                    _meshVertices.Add(cut.GetPoint(origin, tu, tv, cut.Max));
-                    _meshNormals.Add(normal);
-                }
-
-                if (negativeLeaf == BspNode.InIndex)
-                {
-                    for (var i = firstIndex + 2; i < _meshVertices.Count; ++i)
+                    if (negativeLeaf == BspNode.OutIndex)
                     {
-                        _meshIndices.Add(firstIndex);
-                        _meshIndices.Add(i);
-                        _meshIndices.Add(i - 1);
+                        stats.NegativeOut = true;
                     }
-                }
-                else
-                {
-                    for (var i = firstIndex + 2; i < _meshVertices.Count; ++i)
+                    else
                     {
-                        _meshIndices.Add(firstIndex);
-                        _meshIndices.Add(i - 1);
-                        _meshIndices.Add(i);
+                        stats.NegativeIn = true;
+                    }
+
+                    if (positiveLeaf == BspNode.OutIndex)
+                    {
+                        stats.PositiveOut = true;
+                    }
+                    else
+                    {
+                        stats.PositiveIn = true;
+                    }
+
+                    if (negativeLeaf == positiveLeaf) continue;
+
+                    for (var i = _faceCuts.Count - 1; i >= 0; --i)
+                    {
+                        var cut = _faceCuts[i];
+
+                        if (float.IsNegativeInfinity(cut.Min) || float.IsPositiveInfinity(cut.Max))
+                        {
+                            _faceCuts.Clear();
+                            continue;
+                        }
+
+                        if (cut.Max <= cut.Min)
+                        {
+                            _faceCuts.RemoveAt(i);
+                        }
+                    }
+
+                    stats.VertexCount = _faceCuts.Count;
+
+                    if (_faceCuts.Count == 0) continue;
+
+                    _faceCuts.Sort(FaceCut.Comparer);
+
+                    var firstIndex = _meshVertices.Count;
+
+                    var normal = plane.Normal * (positiveLeaf == BspNode.InIndex ? -1f : 1f);
+
+                    foreach (var cut in _faceCuts)
+                    {
+                        _meshVertices.Add(cut.GetPoint(origin, tu, tv, cut.Max));
+                        _meshNormals.Add(normal);
+                    }
+
+                    if (negativeLeaf == BspNode.InIndex)
+                    {
+                        for (var i = firstIndex + 2; i < _meshVertices.Count; ++i)
+                        {
+                            _meshIndices.Add(firstIndex);
+                            _meshIndices.Add(i);
+                            _meshIndices.Add(i - 1);
+                        }
+                    }
+                    else
+                    {
+                        for (var i = firstIndex + 2; i < _meshVertices.Count; ++i)
+                        {
+                            _meshIndices.Add(firstIndex);
+                            _meshIndices.Add(i - 1);
+                            _meshIndices.Add(i);
+                        }
                     }
                 }
 

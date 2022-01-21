@@ -134,7 +134,7 @@ GameObject:
   - component: {fileID: 449291595}
   - component: {fileID: 449291596}
   m_Layer: 0
-  m_Name: Brush
+  m_Name: Outside
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -166,7 +166,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7ddd2cb5e83ee7545bf4c04b89caa879, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  Type: 0
+  Operator: 0
+  Primitive: 0
 --- !u!1 &492896516
 GameObject:
   m_ObjectHideFlags: 0
@@ -396,7 +397,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7ddd2cb5e83ee7545bf4c04b89caa879, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  Type: 1
+  Operator: 1
+  Primitive: 0
 --- !u!1001 &1130165298
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -465,7 +467,7 @@ GameObject:
   - component: {fileID: 1424346741}
   - component: {fileID: 1424346742}
   m_Layer: 0
-  m_Name: Brush (1)
+  m_Name: Inside
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -497,7 +499,53 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7ddd2cb5e83ee7545bf4c04b89caa879, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  Type: 1
+  Operator: 1
+  Primitive: 0
+--- !u!1 &1598310096
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1598310097}
+  - component: {fileID: 1598310098}
+  m_Layer: 0
+  m_Name: Hole
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1598310097
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1598310096}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 2, z: 7}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children: []
+  m_Father: {fileID: 1698812946}
+  m_RootOrder: 3
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1598310098
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1598310096}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7ddd2cb5e83ee7545bf4c04b89caa879, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  Operator: 1
+  Primitive: 1
 --- !u!1 &1698812943
 GameObject:
   m_ObjectHideFlags: 0
@@ -530,6 +578,37 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 044ec0bdc348d654dbfa6ae290ce0cb7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  value: "{ Normal: float3(1f, 0f, 0f), Offset: -8 }\r\n- OUT\r\n+ { Normal: float3(-1f,
+    0f, 0f), Offset: -8 }\r\n  - OUT\r\n  + { Normal: float3(0f, 1f, 0f), Offset:
+    -0.5 }\r\n    - OUT\r\n    + { Normal: float3(0f, -1f, 0f), Offset: -4.5 }\r\n     
+    - OUT\r\n      + { Normal: float3(0f, 0f, 1f), Offset: -8 }\r\n        - OUT\r\n       
+    + { Normal: float3(0f, 0f, -1f), Offset: -8 }\r\n          - OUT\r\n         
+    + { Normal: float3(1f, 0f, 0f), Offset: -7.5 }\r\n            - { Normal: float3(3.576278E-07f,
+    0f, -1f), Offset: -1.000003 }\r\n              - IN\r\n              + { Normal:
+    float3(-3.576278E-07f, 0f, 1f), Offset: -0.9999974 }\r\n                - IN\r\n               
+    + { Normal: float3(0f, 1f, 0f), Offset: 0 }\r\n                  - IN\r\n                 
+    + { Normal: float3(0f, -1f, 0f), Offset: -3 }\r\n                    - IN\r\n                   
+    + OUT\r\n            + { Normal: float3(-1f, 0f, 0f), Offset: -7.5 }\r\n             
+    - IN\r\n              + { Normal: float3(0f, 1f, 0f), Offset: 0 }\r\n               
+    - IN\r\n                + { Normal: float3(0f, -1f, 0f), Offset: -4 }\r\n                 
+    - IN\r\n                  + { Normal: float3(0f, 0f, -1f), Offset: -7 }\r\n                   
+    - { Normal: float3(0f, 1f, 0f), Offset: 1.5 }\r\n                      - IN\r\n                     
+    + { Normal: float3(0f, -1f, 0f), Offset: -2.5 }\r\n                        -
+    IN\r\n                        + { Normal: float3(0f, -0.5f, -0.8660254f), Offset:
+    -7.562178 }\r\n                          - IN\r\n                          +
+    { Normal: float3(-0.8236392f, -0.5000001f, -0.2676166f), Offset: -3.373316 }\r\n                           
+    - IN\r\n                            + { Normal: float3(0.8236392f, 0.5000001f,
+    0.2676166f), Offset: 2.373316 }\r\n                              - IN\r\n                             
+    + { Normal: float3(0.509037f, 0.5f, -0.7006294f), Offset: -4.404406 }\r\n                               
+    - IN\r\n                                + { Normal: float3(0.509037f, -0.5f,
+    0.7006293f), Offset: 3.404405 }\r\n                                  - IN\r\n                                 
+    + { Normal: float3(-0.509037f, 0.5f, -0.7006293f), Offset: -4.404405 }\r\n                                   
+    - IN\r\n                                    + { Normal: float3(0.8236392f, -0.4999999f,
+    -0.2676165f), Offset: -3.373316 }\r\n                                      -
+    IN\r\n                                      + { Normal: float3(-0.8236392f, 0.4999999f,
+    0.2676165f), Offset: 2.373316 }\r\n                                        -
+    IN\r\n                                        + OUT\r\n                    +
+    OUT\r\n"
 --- !u!33 &1698812945
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -552,6 +631,7 @@ Transform:
   - {fileID: 449291595}
   - {fileID: 1424346741}
   - {fileID: 1060383025}
+  - {fileID: 1598310097}
   m_Father: {fileID: 0}
   m_RootOrder: 2
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
