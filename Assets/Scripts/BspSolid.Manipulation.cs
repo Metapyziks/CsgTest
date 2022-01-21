@@ -220,6 +220,13 @@ namespace CsgTest
             foreach (var otherPlane in planes)
             {
                 var cut = Helpers.GetFaceCut(plane, otherPlane, origin, tu, tv);
+
+                if (cut.ExcludesAll)
+                {
+                    var aligned = math.dot(otherPlane.Normal, plane.Normal) > 0f;
+                    return (aligned, !aligned);
+                }
+
                 var (excludesNegative, excludesPositive) = faceCuts.GetNewFaceCutExclusions(cut);
 
                 if (excludesPositive)
@@ -242,7 +249,10 @@ namespace CsgTest
             //        c.GetPoint(origin, tu, tv, c.Max), excluded ? Color.red : Color.blue);
             //}
 
-            if (!excluded) return (false, false);
+            if (!excluded)
+            {
+                return (false, false);
+            }
 
             faceCuts.Clear();
 

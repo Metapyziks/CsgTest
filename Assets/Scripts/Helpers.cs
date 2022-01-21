@@ -60,7 +60,7 @@ namespace CsgTest
             {
                 // If this cut completely excludes the original plane, return a FaceCut that also excludes everything
 
-                return plane.Offset * math.dot(plane.Normal, cutPlane.Normal) > cutPlane.Offset - 0.0001f
+                return plane.Offset * math.dot(plane.Normal, cutPlane.Normal) > cutPlane.Offset + 0.0001f
                     ? FaceCut.ExcludeNone
                     : FaceCut.ExcludeAll;
             }
