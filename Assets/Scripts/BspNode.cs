@@ -4,6 +4,11 @@ namespace CsgTest
 {
     public readonly struct BspNode
     {
+        public static BspNode operator -(BspNode node)
+        {
+            return node.WithNegativeIndex(node.PositiveIndex).WithPositiveIndex(node.NegativeIndex);
+        }
+
         public const ushort InIndex = 0;
         public const ushort OutIndex = ushort.MaxValue;
 

@@ -378,9 +378,9 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1060383024}
-  m_LocalRotation: {x: -0, y: 0.70710665, z: -0, w: 0.707107}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -7.75, y: 1.5, z: 0}
-  m_LocalScale: {x: 2, y: 3, z: 0.5}
+  m_LocalScale: {x: 0.5, y: 3, z: 2}
   m_Children: []
   m_Father: {fileID: 1698812946}
   m_RootOrder: 2
@@ -526,7 +526,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1598310096}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 2, z: 7}
+  m_LocalPosition: {x: 0, y: 2, z: 9.027}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 1698812946}
@@ -545,7 +545,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   Operator: 1
-  Primitive: 1
+  Primitive: 0
 --- !u!1 &1698812943
 GameObject:
   m_ObjectHideFlags: 0
@@ -578,37 +578,25 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 044ec0bdc348d654dbfa6ae290ce0cb7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  value: "{ Normal: float3(1f, 0f, 0f), Offset: -8 }\r\n- OUT\r\n+ { Normal: float3(-1f,
-    0f, 0f), Offset: -8 }\r\n  - OUT\r\n  + { Normal: float3(0f, 1f, 0f), Offset:
-    -0.5 }\r\n    - OUT\r\n    + { Normal: float3(0f, -1f, 0f), Offset: -4.5 }\r\n     
-    - OUT\r\n      + { Normal: float3(0f, 0f, 1f), Offset: -8 }\r\n        - OUT\r\n       
-    + { Normal: float3(0f, 0f, -1f), Offset: -8 }\r\n          - OUT\r\n         
-    + { Normal: float3(1f, 0f, 0f), Offset: -7.5 }\r\n            - { Normal: float3(3.576278E-07f,
-    0f, -1f), Offset: -1.000003 }\r\n              - IN\r\n              + { Normal:
-    float3(-3.576278E-07f, 0f, 1f), Offset: -0.9999974 }\r\n                - IN\r\n               
-    + { Normal: float3(0f, 1f, 0f), Offset: 0 }\r\n                  - IN\r\n                 
-    + { Normal: float3(0f, -1f, 0f), Offset: -3 }\r\n                    - IN\r\n                   
-    + OUT\r\n            + { Normal: float3(-1f, 0f, 0f), Offset: -7.5 }\r\n             
-    - IN\r\n              + { Normal: float3(0f, 1f, 0f), Offset: 0 }\r\n               
-    - IN\r\n                + { Normal: float3(0f, -1f, 0f), Offset: -4 }\r\n                 
-    - IN\r\n                  + { Normal: float3(0f, 0f, -1f), Offset: -7 }\r\n                   
-    - { Normal: float3(0f, 1f, 0f), Offset: 1.5 }\r\n                      - IN\r\n                     
-    + { Normal: float3(0f, -1f, 0f), Offset: -2.5 }\r\n                        -
-    IN\r\n                        + { Normal: float3(0f, -0.5f, -0.8660254f), Offset:
-    -7.562178 }\r\n                          - IN\r\n                          +
-    { Normal: float3(-0.8236392f, -0.5000001f, -0.2676166f), Offset: -3.373316 }\r\n                           
-    - IN\r\n                            + { Normal: float3(0.8236392f, 0.5000001f,
-    0.2676166f), Offset: 2.373316 }\r\n                              - IN\r\n                             
-    + { Normal: float3(0.509037f, 0.5f, -0.7006294f), Offset: -4.404406 }\r\n                               
-    - IN\r\n                                + { Normal: float3(0.509037f, -0.5f,
-    0.7006293f), Offset: 3.404405 }\r\n                                  - IN\r\n                                 
-    + { Normal: float3(-0.509037f, 0.5f, -0.7006293f), Offset: -4.404405 }\r\n                                   
-    - IN\r\n                                    + { Normal: float3(0.8236392f, -0.4999999f,
-    -0.2676165f), Offset: -3.373316 }\r\n                                      -
-    IN\r\n                                      + { Normal: float3(-0.8236392f, 0.4999999f,
-    0.2676165f), Offset: 2.373316 }\r\n                                        -
-    IN\r\n                                        + OUT\r\n                    +
-    OUT\r\n"
+  value: "NODE 0: PLANE 0 { Normal: float3(1f, 0f, 0f), Offset: -8 }\r\n- OUT\r\n+
+    NODE 1: PLANE 1 { Normal: float3(-1f, 0f, 0f), Offset: -8 }\r\n  - OUT\r\n  +
+    NODE 2: PLANE 2 { Normal: float3(0f, 1f, 0f), Offset: -0.5 }\r\n    - OUT\r\n   
+    + NODE 3: PLANE 3 { Normal: float3(0f, -1f, 0f), Offset: -4.5 }\r\n      - OUT\r\n     
+    + NODE 4: PLANE 4 { Normal: float3(0f, 0f, 1f), Offset: -8 }\r\n        - OUT\r\n       
+    + NODE 5: PLANE 5 { Normal: float3(0f, 0f, -1f), Offset: -8 }\r\n          -
+    OUT\r\n          + NODE 6: PLANE 6 { Normal: float3(1f, 0f, 0f), Offset: -7.5
+    }\r\n            - NODE 11: PLANE 11 { Normal: float3(0f, 1f, 0f), Offset: 0
+    }\r\n              - IN\r\n              + NODE 12: PLANE 12 { Normal: float3(0f,
+    -1f, 0f), Offset: -3 }\r\n                - IN\r\n                + NODE 13:
+    PLANE 13 { Normal: float3(0f, 0f, 1f), Offset: -1 }\r\n                  - IN\r\n                 
+    + NODE 14: PLANE 14 { Normal: float3(0f, 0f, -1f), Offset: -1 }\r\n                   
+    - IN\r\n                    + OUT\r\n            + NODE 7: PLANE 7 { Normal:
+    float3(-1f, 0f, 0f), Offset: -7.5 }\r\n              - IN\r\n              +
+    NODE 8: PLANE 8 { Normal: float3(0f, 1f, 0f), Offset: 0 }\r\n               
+    - IN\r\n                + NODE 9: PLANE 9 { Normal: float3(0f, -1f, 0f), Offset:
+    -4 }\r\n                  - IN\r\n                  + NODE 10: PLANE 10 { Normal:
+    float3(0f, 0f, -1f), Offset: -7 }\r\n                    - IN\r\n                   
+    + OUT\r\n"
 --- !u!33 &1698812945
 MeshFilter:
   m_ObjectHideFlags: 0

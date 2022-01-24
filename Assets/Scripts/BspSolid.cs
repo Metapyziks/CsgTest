@@ -16,6 +16,8 @@ namespace CsgTest
         private NativeArray<BspPlane> _planes;
         private NativeArray<BspNode> _nodes;
 
+        private readonly Dictionary<BspPlane, ushort> _planeDict = new Dictionary<BspPlane, ushort>();
+
         private int _planeCount;
         private int _nodeCount;
 
@@ -68,17 +70,30 @@ namespace CsgTest
         {
             _nodeCount = 0;
             _planeCount = 0;
+
+            _planeDict.Clear();
         }
 
-        private ushort AddPlane(BspPlane plane)
+        private (ushort Index, bool flipped) AddPlane(BspPlane plane)
         {
-            // TODO: merge planes
+            if (_planeDict.TryGetValue(plane, out var index))
+            {
+                return (index, false);
+            }
+
+            if (_planeDict.TryGetValue(-plane, out index))
+            {
+                return (index, true);
+            }
 
             Helpers.EnsureCapacity(ref _planes, _planeCount + 1);
 
-            _planes[_planeCount] = plane;
+            index = (ushort)_planeCount++;
+            _planes[index] = plane;
 
-            return (ushort)_planeCount++;
+            _planeDict.Add(plane, index);
+
+            return (index, false);
         }
 
         private ushort AddNode(ushort planeIndex, ushort parentIndex, ushort negativeIndex, ushort positiveIndex)
@@ -126,7 +141,7 @@ namespace CsgTest
 
             var writer = new StringWriter();
 
-            WriteNode(writer, _nodes[0], 0);
+            WriteNode(writer, 0, 0);
 
             return writer.ToString();
         }
@@ -139,10 +154,12 @@ namespace CsgTest
             }
         }
 
-        private void WriteNode(StringWriter writer, BspNode node, int depth)
+        private void WriteNode(StringWriter writer, ushort index, int depth)
         {
+            var node = _nodes[index];
+
             var plane = _planes[node.PlaneIndex];
-            writer.WriteLine(plane);
+            writer.WriteLine($"NODE {index}: PLANE {node.PlaneIndex} {plane}");
 
             WriteIndentation(writer, depth);
             writer.Write("- ");
@@ -156,7 +173,7 @@ namespace CsgTest
                     writer.WriteLine("IN");
                     break;
                 default:
-                    WriteNode(writer, _nodes[node.NegativeIndex], depth + 1);
+                    WriteNode(writer, node.NegativeIndex, depth + 1);
                     break;
             }
 
@@ -172,7 +189,7 @@ namespace CsgTest
                     writer.WriteLine("IN");
                     break;
                 default:
-                    WriteNode(writer, _nodes[node.PositiveIndex], depth + 1);
+                    WriteNode(writer, node.PositiveIndex, depth + 1);
                     break;
             }
         }
