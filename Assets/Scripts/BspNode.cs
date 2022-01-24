@@ -1,4 +1,5 @@
-﻿using Unity.Collections;
+﻿using System.Collections.Generic;
+using Unity.Collections;
 
 namespace CsgTest
 {
@@ -37,17 +38,9 @@ namespace CsgTest
             return new BspNode(PlaneIndex, ParentIndex, NegativeIndex, value);
         }
 
-        public BspNode Inserted(ushort rootParentIndex, int nodeIndexOffset, int planeIndexOffset, ushort outValue, ushort inValue)
+        public BspNode Remapped(Dictionary<ushort, ushort> nodeRemapDict)
         {
-            return new BspNode((ushort)(PlaneIndex + planeIndexOffset),
-                ParentIndex == NullParentIndex ? rootParentIndex : (ushort)(ParentIndex + nodeIndexOffset),
-                IsLeafIndex(NegativeIndex) ? NegativeIndex == OutIndex ? outValue : inValue : (ushort)(NegativeIndex + nodeIndexOffset),
-                IsLeafIndex(PositiveIndex) ? PositiveIndex == OutIndex ? outValue : inValue : (ushort)(PositiveIndex + nodeIndexOffset));
-        }
-
-        public BspNode Remapped(ushort planeIndex, NativeArray<ushort> nodeRemapDict)
-        {
-            return new BspNode(planeIndex,
+            return new BspNode(PlaneIndex,
                 ParentIndex == NullParentIndex ? NullParentIndex : nodeRemapDict[ParentIndex],
                 IsLeafIndex(NegativeIndex) ? NegativeIndex : nodeRemapDict[NegativeIndex],
                 IsLeafIndex(PositiveIndex) ? PositiveIndex : nodeRemapDict[PositiveIndex]);
