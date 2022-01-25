@@ -46,7 +46,7 @@ namespace CsgTest
 
         public float3 GetPoint(float3 origin, float3 tu, float3 tv, float along)
         {
-            var pos = Normal * Distance + new float2(-Normal.y, Normal.x) * math.clamp(along, -128f, 128f);
+            var pos = Normal * Distance + new float2(-Normal.y, Normal.x) * along;
 
             return origin + tu * pos.x + tv * pos.y;
         }
