@@ -1,8 +1,5 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
@@ -11,6 +8,22 @@ namespace CsgTest
 {
     partial class BspSolid
     {
+        private readonly struct Face
+        {
+            public readonly ushort FirstVertex;
+            public readonly ushort VertexCount;
+            public readonly bool Flipped;
+            public readonly float3 Normal;
+
+            public Face(ushort firstVertex, ushort vertexCount, bool flipped, float3 normal)
+            {
+                FirstVertex = firstVertex;
+                VertexCount = vertexCount;
+                Flipped = flipped;
+                Normal = normal;
+            }
+        }
+
         private class MeshGenerator
         {
             private readonly HashSet<uint> _pathSet = new HashSet<uint>();
@@ -18,70 +31,179 @@ namespace CsgTest
 
             private readonly Stack<BspPlane> _planeStack = new Stack<BspPlane>();
 
-            private readonly List<Vector3> _meshVertices = new List<Vector3>();
-            private readonly List<Vector3> _meshNormals = new List<Vector3>();
-            private readonly List<int> _meshIndices = new List<int>();
+            private readonly List<Face> _faces = new List<Face>();
+            private readonly List<Vector3> _vertices = new List<Vector3>();
 
             private readonly List<FaceCut> _nodeCuts = new List<FaceCut>();
             private readonly List<FaceCut> _faceCuts = new List<FaceCut>();
 
             private NativeArray<BspNode> _nodes;
-            private int _nodeCount;
-
             private NativeArray<BspPlane> _planes;
-            private int _planeCount;
+            private int _triangleCount;
 
-            public void WriteToMesh(BspSolid solid, Mesh mesh)
+            private bool _enableIndexFilter;
+            private readonly HashSet<ushort> _indexFilter = new HashSet<ushort>();
+
+            public void Clear()
             {
-                mesh?.Clear();
+                _faces.Clear();
+                _vertices.Clear();
+                _triangleCount = 0;
 
-                _meshVertices.Clear();
-                _meshNormals.Clear();
-                _meshIndices.Clear();
-
-                _nodes = solid._nodes;
-                _nodeCount = solid._nodeCount;
-
-                _planes = solid._planes;
-                _planeCount = solid._planeCount;
-
-                _planeStack.Clear();
-
-                TriangulateFaces(_planeStack, _nodes[0]);
-
-                _nodes = default;
-                _nodeCount = 0;
-
-                _planes = default;
-                _planeCount = 0;
-
-                mesh?.SetVertices(_meshVertices);
-                mesh?.SetNormals(_meshNormals);
-                mesh?.SetTriangles(_meshIndices, 0);
-
-                mesh?.UploadMeshData(false);
-
-                mesh?.MarkModified();
+                _enableIndexFilter = false;
+                _indexFilter.Clear();
             }
 
-            private TriangulationStats TriangulateFaces(Stack<BspPlane> planes, BspNode node)
+            public void FilterNodes(IEnumerable<int> indices)
             {
+                _enableIndexFilter = true;
+
+                foreach (var index in indices)
+                {
+                    _indexFilter.Add((ushort) index);
+                }
+            }
+
+            private void Init(BspSolid solid)
+            {
+                _nodes = solid._nodes;
+                _planes = solid._planes;
+
+                _planeStack.Clear();
+            }
+
+            private void CleanUp()
+            {
+                _nodes = default;
+                _planes = default;
+
+                _enableIndexFilter = false;
+                _indexFilter.Clear();
+            }
+
+            public void Write(BspSolid solid)
+            {
+                if (solid._nodeCount == 0) return;
+
+                Init(solid);
+                TriangulateFaces(_planeStack, 0);
+                CleanUp();
+            }
+
+            public void CopyToMesh(Mesh mesh)
+            {
+                mesh.Clear();
+
+                var normals = new NativeArray<float3>(_vertices.Count, Allocator.Temp);
+                var indices = new NativeArray<ushort>(_triangleCount * 3, Allocator.Temp);
+
+                var writeIndex = 0;
+                
+                foreach (var face in _faces)
+                {
+                    for (var i = 0; i < face.VertexCount; ++i)
+                    {
+                        normals[face.FirstVertex + i] = face.Normal;
+                    }
+
+                    if (face.Flipped)
+                    {
+                        for (var i = 2; i < face.VertexCount; ++i)
+                        {
+                            indices[writeIndex++] = face.FirstVertex;
+                            indices[writeIndex++] = (ushort)(face.FirstVertex + i - 1);
+                            indices[writeIndex++] = (ushort)(face.FirstVertex + i);
+                        }
+                    }
+                    else
+                    {
+                        for (var i = 2; i < face.VertexCount; ++i)
+                        {
+                            indices[writeIndex++] = face.FirstVertex;
+                            indices[writeIndex++] = (ushort)(face.FirstVertex + i);
+                            indices[writeIndex++] = (ushort)(face.FirstVertex + i - 1);
+                        }
+                    }
+                }
+
+                mesh.SetVertices(_vertices);
+                mesh.SetNormals(normals);
+                mesh.SetIndices(indices, MeshTopology.Triangles, 0);
+
+                normals.Dispose();
+                indices.Dispose();
+
+                mesh.UploadMeshData(false);
+
+                mesh.MarkModified();
+            }
+
+            public void DebugDraw()
+            {
+                const float margin = 0.05f;
+
+                var random = new Unity.Mathematics.Random(0x54ad3e92);
+
+                var index = 0;
+                foreach (var face in _faces)
+                {
+                    Gizmos.color = new Color(random.NextFloat(), random.NextFloat(), random.NextFloat());
+
+                    var prev = (float3) _vertices[face.FirstVertex + face.VertexCount - 1];
+                    var avg = float3.zero;
+
+                    for (var i = 0; i < face.VertexCount; ++i)
+                    {
+                        var next = (float3) _vertices[face.FirstVertex + i];
+                        var tangent = math.normalizesafe(next - prev);
+                        var binormal = math.normalizesafe(math.cross(tangent, face.Normal));
+                        var offset = face.Normal * ((index + 1) * 0.001f)
+                            + (face.Flipped ? -binormal * margin : binormal * margin);
+
+                        Gizmos.DrawLine(
+                            prev + offset + tangent * margin,
+                            next + offset - tangent * margin);
+
+                        avg += next;
+                        prev = next;
+                    }
+
+#if UNITY_EDITOR
+                    avg /= face.VertexCount;
+
+                    UnityEditor.Handles.color = Gizmos.color;
+                    UnityEditor.Handles.Label(avg + face.Normal * index * 0.05f, $"face {index}");
+#endif
+
+                    ++index;
+                }
+            }
+
+            private TriangulationStats TriangulateFaces(Stack<BspPlane> planes, ushort index)
+            {
+                var node = _nodes[index];
+
                 if (node.NegativeIndex == node.PositiveIndex && BspNode.IsLeafIndex(node.NegativeIndex)) return default;
 
                 var plane = _planes[node.PlaneIndex];
-                var stats = TriangulateFace(planes, node);
+                TriangulationStats stats = default;
+
+                if (!_enableIndexFilter || _indexFilter.Count == 0 || _indexFilter.Contains(index))
+                {
+                    stats += TriangulateFace(planes, node);
+                }
 
                 if (!BspNode.IsLeafIndex(node.NegativeIndex))
                 {
                     planes.Push(-plane);
-                    stats += TriangulateFaces(planes, _nodes[node.NegativeIndex]);
+                    stats += TriangulateFaces(planes, node.NegativeIndex);
                     planes.Pop();
                 }
 
                 if (!BspNode.IsLeafIndex(node.PositiveIndex))
                 {
                     planes.Push(plane);
-                    stats += TriangulateFaces(planes, _nodes[node.PositiveIndex]);
+                    stats += TriangulateFaces(planes, node.PositiveIndex);
                     planes.Pop();
                 }
 
@@ -158,7 +280,7 @@ namespace CsgTest
                         stats.PositiveIn = true;
                     }
 
-                    if (negativeLeaf == positiveLeaf) continue;
+                    if (!_enableIndexFilter && negativeLeaf == positiveLeaf) continue;
 
                     for (var i = _faceCuts.Count - 1; i >= 0; --i)
                     {
@@ -167,7 +289,7 @@ namespace CsgTest
                         if (float.IsNegativeInfinity(cut.Min) || float.IsPositiveInfinity(cut.Max))
                         {
                             _faceCuts.Clear();
-                            continue;
+                            break;
                         }
 
                         if (cut.Max <= cut.Min)
@@ -176,39 +298,23 @@ namespace CsgTest
                         }
                     }
 
-                    stats.VertexCount = _faceCuts.Count;
+                    stats.VertexCount += _faceCuts.Count;
 
                     if (_faceCuts.Count == 0) continue;
 
                     _faceCuts.Sort(FaceCut.Comparer);
 
-                    var firstIndex = _meshVertices.Count;
-
+                    var firstVertex = (ushort) _vertices.Count;
+                    var vertexCount = (ushort) _faceCuts.Count;
+                    var flipped = positiveLeaf == BspNode.InIndex;
                     var normal = plane.Normal * (positiveLeaf == BspNode.InIndex ? -1f : 1f);
+
+                    _faces.Add(new Face(firstVertex, vertexCount, flipped, normal));
+                    _triangleCount += vertexCount - 2;
 
                     foreach (var cut in _faceCuts)
                     {
-                        _meshVertices.Add(cut.GetPoint(origin, tu, tv, cut.Max));
-                        _meshNormals.Add(normal);
-                    }
-
-                    if (negativeLeaf == BspNode.InIndex)
-                    {
-                        for (var i = firstIndex + 2; i < _meshVertices.Count; ++i)
-                        {
-                            _meshIndices.Add(firstIndex);
-                            _meshIndices.Add(i);
-                            _meshIndices.Add(i - 1);
-                        }
-                    }
-                    else
-                    {
-                        for (var i = firstIndex + 2; i < _meshVertices.Count; ++i)
-                        {
-                            _meshIndices.Add(firstIndex);
-                            _meshIndices.Add(i - 1);
-                            _meshIndices.Add(i);
-                        }
+                        _vertices.Add(cut.GetPoint(origin, tu, tv, cut.Max));
                     }
                 }
 
@@ -297,9 +403,30 @@ namespace CsgTest
         [ThreadStatic]
         private static MeshGenerator _sMeshGenerator;
 
+        private static MeshGenerator GetMeshGenerator()
+        {
+            if (_sMeshGenerator == null) _sMeshGenerator = new MeshGenerator();
+
+            _sMeshGenerator.Clear();
+
+            return _sMeshGenerator;
+        }
+
         public void WriteToMesh(Mesh mesh)
         {
-            (_sMeshGenerator ?? (_sMeshGenerator = new MeshGenerator())).WriteToMesh(this, mesh);
+            var meshGen = GetMeshGenerator();
+
+            meshGen.Write(this);
+            meshGen.CopyToMesh(mesh);
+        }
+
+        public void DrawDebugNodes(IEnumerable<int> nodeIndices)
+        {
+            var meshGen = GetMeshGenerator();
+
+            meshGen.FilterNodes(nodeIndices);
+            meshGen.Write(this);
+            meshGen.DebugDraw();
         }
     }
 }

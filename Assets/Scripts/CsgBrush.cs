@@ -24,7 +24,7 @@ namespace CsgTest
         public BrushOperator Operator;
         public Primitive Primitive;
 
-        private void OnDrawGizmos()
+        private void OnDrawGizmosSelected()
         {
             Gizmos.matrix = transform.localToWorldMatrix;
             Gizmos.color = Operator == BrushOperator.Add ? Color.blue : Color.yellow;

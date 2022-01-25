@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -15,6 +17,8 @@ namespace CsgTest
 
         [Multiline(32)]
         public string value;
+
+        public List<int> debugNodes;
 
         private bool _geometryInvalid;
         private bool _meshInvalid;
@@ -110,6 +114,14 @@ namespace CsgTest
                 {
                     _collider.sharedMesh = _mesh;
                 }
+            }
+        }
+
+        void OnDrawGizmos()
+        {
+            if (debugNodes != null)
+            {
+                _solid.DrawDebugNodes(debugNodes);
             }
         }
     }

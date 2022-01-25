@@ -141,7 +141,7 @@ namespace CsgTest
                 {
                     excludesAny = true;
 
-                    if (proj1 < other.Min)
+                    if (proj1 < other.Min + 0.0001f)
                     {
                         ++excludedCutCount;
                     }
@@ -150,7 +150,7 @@ namespace CsgTest
                 {
                     excludesAny = true;
 
-                    if (proj1 > other.Max)
+                    if (proj1 > other.Max - 0.0001f)
                     {
                         ++excludedCutCount;
                     }
@@ -204,7 +204,7 @@ namespace CsgTest
                     other.Min = math.max(other.Min, proj1);
                 }
 
-                if (other.Min >= other.Max)
+                if (other.Min >= other.Max - 0.0001f)
                 {
                     faceCuts.RemoveAt(i);
                 }
@@ -214,7 +214,7 @@ namespace CsgTest
                 }
             }
 
-            if (cut.Min >= cut.Max)
+            if (cut.Min >= cut.Max - 0.0001f)
             {
                 return false;
             }
