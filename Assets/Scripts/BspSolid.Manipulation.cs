@@ -6,6 +6,7 @@ using System.Linq;
 using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
+using Debug = UnityEngine.Debug;
 
 namespace CsgTest
 {
@@ -22,6 +23,8 @@ namespace CsgTest
 
     partial class BspSolid
     {
+        public const float Epsilon = 0.000001f;
+
         public void Cut(BspPlane plane)
         {
             var (planeIndex, flipped) = AddPlane(plane);
@@ -160,7 +163,7 @@ namespace CsgTest
 
         [ThreadStatic] private static Stack<BspPlane> _sMergePlanes;
 
-        private void Merge(Stack<BspPlane> leafPlanes, NativeArray<float3> vertices, int vertexCount, ushort nodeIndex, NativeArray<BspNode> nodes, int rootIndex, NativeArray<BspPlane> planes, CsgOperator op)
+        private ushort Merge(Stack<BspPlane> leafPlanes, NativeArray<float3> vertices, int vertexCount, ushort nodeIndex, NativeArray<BspNode> nodes, int rootIndex, NativeArray<BspPlane> planes, CsgOperator op)
         {
             var node = _nodes[nodeIndex];
             var plane = _planes[node.PlaneIndex];
@@ -173,12 +176,12 @@ namespace CsgTest
                 var vertex = vertices[i];
                 var dist = math.dot(plane.Normal, vertex) - plane.Offset;
 
-                if (dist > 0.0001f)
+                if (dist > Epsilon)
                 {
                     anyPositive = true;
                     if (anyNegative) break;
                 }
-                else if (dist < -0.0001f)
+                else if (dist < -Epsilon)
                 {
                     anyNegative = true;
                     if (anyPositive) break;
@@ -196,7 +199,7 @@ namespace CsgTest
                 }
                 else
                 {
-                    Merge(leafPlanes, vertices, vertexCount, node.NegativeIndex, nodes, rootIndex, planes, op);
+                    node = node.WithNegativeIndex(Merge(leafPlanes, vertices, vertexCount, node.NegativeIndex, nodes, rootIndex, planes, op));
                 }
 
                 leafPlanes.Pop();
@@ -213,13 +216,19 @@ namespace CsgTest
                 }
                 else
                 {
-                    Merge(leafPlanes, vertices, vertexCount, node.PositiveIndex, nodes, rootIndex, planes, op);
+                    node = node.WithPositiveIndex(Merge(leafPlanes, vertices, vertexCount, node.PositiveIndex, nodes, rootIndex, planes, op));
                 }
 
                 leafPlanes.Pop();
             }
 
+            if (BspNode.IsLeafIndex(node.NegativeIndex) && node.NegativeIndex == node.PositiveIndex)
+            {
+                return node.NegativeIndex;
+            }
+
             _nodes[nodeIndex] = node;
+            return nodeIndex;
         }
         
         [ThreadStatic]
@@ -311,7 +320,23 @@ namespace CsgTest
 
                 if (excludesPositive)
                 {
+                    continue;
                     // TODO
+                    Debug.Log("Hmm");
+
+                    faceCuts.Sort(FaceCut.Comparer);
+
+                    foreach (var c in faceCuts)
+                    {
+                        Debug.DrawLine(c.GetPoint(origin, tu, tv, c.Min),
+                            c.GetPoint(origin, tu, tv, c.Max), Color.red);
+                    }
+
+                    Debug.DrawLine(cut.GetPoint(origin, tu, tv, -16f),
+                        cut.GetPoint(origin, tu, tv, 16f), Color.blue);
+
+                    Debug.DrawLine(plane.Normal * plane.Offset, plane.Normal * (plane.Offset + 0.25f), Color.green);
+
                     return (false, false);
                 }
 

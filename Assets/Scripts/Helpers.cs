@@ -56,11 +56,11 @@ namespace CsgTest
         {
             var cutTangent = math.cross(plane.Normal, cutPlane.Normal);
 
-            if (math.lengthsq(cutTangent) <= 0.000001f)
+            if (math.lengthsq(cutTangent) <= BspSolid.Epsilon * BspSolid.Epsilon)
             {
                 // If this cut completely excludes the original plane, return a FaceCut that also excludes everything
 
-                return plane.Offset * math.dot(plane.Normal, cutPlane.Normal) > cutPlane.Offset + 0.0001f
+                return plane.Offset * math.dot(plane.Normal, cutPlane.Normal) > cutPlane.Offset + BspSolid.Epsilon
                     ? FaceCut.ExcludeNone
                     : FaceCut.ExcludeAll;
             }
@@ -102,7 +102,7 @@ namespace CsgTest
                 var cross = Helpers.Cross(cut.Normal, other.Normal);
                 var dot = math.dot(cut.Normal, other.Normal);
 
-                if (math.abs(cross) <= 0.0001f)
+                if (math.abs(cross) <= BspSolid.Epsilon)
                 {
                     if (cut.Equals(other))
                     {
@@ -141,7 +141,7 @@ namespace CsgTest
                 {
                     excludesAny = true;
 
-                    if (proj1 < other.Min + 0.0001f)
+                    if (proj1 < other.Min + BspSolid.Epsilon)
                     {
                         ++excludedCutCount;
                     }
@@ -150,7 +150,7 @@ namespace CsgTest
                 {
                     excludesAny = true;
 
-                    if (proj1 > other.Max - 0.0001f)
+                    if (proj1 > other.Max - BspSolid.Epsilon)
                     {
                         ++excludedCutCount;
                     }
@@ -168,7 +168,7 @@ namespace CsgTest
                 var cross = Helpers.Cross(cut.Normal, other.Normal);
                 var dot = math.dot(cut.Normal, other.Normal);
 
-                if (math.abs(cross) <= 0.0001f)
+                if (math.abs(cross) <= BspSolid.Epsilon)
                 {
                     if (other.Distance * dot < cut.Distance)
                     {
@@ -204,7 +204,7 @@ namespace CsgTest
                     other.Min = math.max(other.Min, proj1);
                 }
 
-                if (other.Min >= other.Max - 0.0001f)
+                if (other.Min >= other.Max - BspSolid.Epsilon)
                 {
                     faceCuts.RemoveAt(i);
                 }
@@ -214,7 +214,7 @@ namespace CsgTest
                 }
             }
 
-            if (cut.Min >= cut.Max - 0.0001f)
+            if (cut.Min >= cut.Max - BspSolid.Epsilon)
             {
                 return false;
             }

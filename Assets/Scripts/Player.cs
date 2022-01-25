@@ -115,9 +115,9 @@ namespace CsgTest
 
             var position = hitInfo.point;
             var rotation = UnityEngine.Random.rotationUniform;
-            var localScale = new Vector3(UnityEngine.Random.value * 0.25f + 1f,
-                UnityEngine.Random.value * 0.25f + 1f,
-                UnityEngine.Random.value * 0.25f + 1f);
+            var localScale = new Vector3(UnityEngine.Random.value * 0.25f + 2.5f,
+                UnityEngine.Random.value * 0.25f + 2.5f,
+                UnityEngine.Random.value * 0.25f + 2.5f);
 
             bspDemo.Subtract(float4x4.TRS(position, rotation, localScale));
             bspDemo.LogInfo();
