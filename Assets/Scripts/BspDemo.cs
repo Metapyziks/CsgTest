@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -19,6 +20,7 @@ namespace CsgTest
         public string value;
 
         public List<int> debugNodes;
+        public bool debugDraw;
 
         private bool _geometryInvalid;
         private bool _meshInvalid;
@@ -119,10 +121,15 @@ namespace CsgTest
 
         void OnDrawGizmos()
         {
-            if (debugNodes != null)
+            if (debugDraw)
             {
-                _solid.DrawDebugNodes(debugNodes);
+                _solid.DrawDebugNodes(debugNodes ?? Enumerable.Empty<int>());
             }
+        }
+
+        public void LogInfo()
+        {
+            _solid.LogInfo();
         }
     }
 }

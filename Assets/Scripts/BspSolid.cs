@@ -21,6 +21,26 @@ namespace CsgTest
         private int _planeCount;
         private int _nodeCount;
 
+        private bool _verticesValid;
+        private int _vertexCount;
+        private NativeArray<float3> _vertices;
+
+        private void UpdateVertices()
+        {
+            if (_verticesValid) return;
+
+            var meshGen = GetMeshGenerator();
+
+            meshGen.Write(this);
+
+            _vertexCount = meshGen.VertexCount;
+
+            Helpers.EnsureCapacity(ref _vertices, _vertexCount);
+            meshGen.CopyVertices(_vertices);
+
+            _verticesValid = true;
+        }
+
         public static BspSolid CreateBox(float3 center, float3 size)
         {
             var mesh = new BspSolid
@@ -72,6 +92,8 @@ namespace CsgTest
             _planeCount = 0;
 
             _planeDict.Clear();
+
+            _verticesValid = false;
         }
 
         private (ushort Index, bool flipped) AddPlane(BspPlane plane)
@@ -86,6 +108,11 @@ namespace CsgTest
                 return (index, true);
             }
 
+            if (_planeCount >= ushort.MaxValue - 1)
+            {
+                throw new Exception("Too many planes!");
+            }
+
             Helpers.EnsureCapacity(ref _planes, _planeCount + 1);
 
             index = (ushort)_planeCount++;
@@ -98,9 +125,15 @@ namespace CsgTest
 
         private ushort AddNode(ushort planeIndex, ushort parentIndex, ushort negativeIndex, ushort positiveIndex)
         {
+            if (_nodeCount >= ushort.MaxValue - 1)
+            {
+                throw new Exception("Too many nodes!");
+            }
+
             Helpers.EnsureCapacity(ref _nodes, _nodeCount + 1);
 
             _nodes[_nodeCount] = new BspNode(planeIndex, parentIndex, negativeIndex, positiveIndex);
+            _verticesValid = false;
 
             return (ushort)_nodeCount++;
         }
@@ -113,6 +146,8 @@ namespace CsgTest
             {
                 _planes[i] = _planes[i].Transform(matrix, transInvMatrix);
             }
+
+            _verticesValid = false;
         }
 
         public void Dispose()
@@ -130,6 +165,14 @@ namespace CsgTest
             }
 
             _nodeCount = 0;
+
+            if (_vertices.IsCreated)
+            {
+                _vertices.Dispose();
+            }
+
+            _vertexCount = 0;
+            _verticesValid = false;
         }
 
         public override string ToString()
@@ -192,6 +235,11 @@ namespace CsgTest
                     WriteNode(writer, node.PositiveIndex, depth + 1);
                     break;
             }
+        }
+
+        public void LogInfo()
+        {
+            Debug.Log($"Nodes: {_nodeCount}, Planes: {_planeCount}");
         }
     }
 }

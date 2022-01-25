@@ -24,7 +24,7 @@ namespace CsgTest
             }
         }
 
-        private class MeshGenerator
+        private class MeshGenerator : IDisposable
         {
             private readonly HashSet<uint> _pathSet = new HashSet<uint>();
             private readonly Queue<uint> _pathQueue = new Queue<uint>();
@@ -32,13 +32,15 @@ namespace CsgTest
             private readonly Stack<BspPlane> _planeStack = new Stack<BspPlane>();
 
             private readonly List<Face> _faces = new List<Face>();
-            private readonly List<Vector3> _vertices = new List<Vector3>();
 
             private readonly List<FaceCut> _nodeCuts = new List<FaceCut>();
             private readonly List<FaceCut> _faceCuts = new List<FaceCut>();
 
+            private NativeArray<float3> _vertices;
             private NativeArray<BspNode> _nodes;
             private NativeArray<BspPlane> _planes;
+
+            private int _vertexCount;
             private int _triangleCount;
 
             private bool _enableIndexFilter;
@@ -47,7 +49,8 @@ namespace CsgTest
             public void Clear()
             {
                 _faces.Clear();
-                _vertices.Clear();
+
+                _vertexCount = 0;
                 _triangleCount = 0;
 
                 _enableIndexFilter = false;
@@ -90,11 +93,34 @@ namespace CsgTest
                 CleanUp();
             }
 
+            public Bounds CalculateBounds()
+            {
+                var min = new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
+                var max = new Vector3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
+
+                foreach (var vertex in _vertices)
+                {
+                    min = Vector3.Min(min, vertex);
+                    max = Vector3.Max(max, vertex);
+                }
+
+                return new Bounds((min + max) * 0.5f, max - min);
+            }
+
+            public int VertexCount => _vertexCount;
+
+            public void CopyVertices(NativeArray<float3> dst)
+            {
+                if (_vertexCount == 0) return;
+
+                NativeArray<float3>.Copy(_vertices, 0, dst, 0, _vertexCount);
+            }
+
             public void CopyToMesh(Mesh mesh)
             {
                 mesh.Clear();
 
-                var normals = new NativeArray<float3>(_vertices.Count, Allocator.Temp);
+                var normals = new NativeArray<float3>(_vertexCount, Allocator.Temp);
                 var indices = new NativeArray<ushort>(_triangleCount * 3, Allocator.Temp);
 
                 var writeIndex = 0;
@@ -126,8 +152,8 @@ namespace CsgTest
                     }
                 }
 
-                mesh.SetVertices(_vertices);
-                mesh.SetNormals(normals);
+                mesh.SetVertices(_vertices, 0, _vertexCount);
+                mesh.SetNormals(normals, 0, _vertexCount);
                 mesh.SetIndices(indices, MeshTopology.Triangles, 0);
 
                 normals.Dispose();
@@ -157,7 +183,7 @@ namespace CsgTest
                         var next = (float3) _vertices[face.FirstVertex + i];
                         var tangent = math.normalizesafe(next - prev);
                         var binormal = math.normalizesafe(math.cross(tangent, face.Normal));
-                        var offset = face.Normal * ((index + 1) * 0.001f)
+                        var offset = face.Normal * 0.001f
                             + (face.Flipped ? -binormal * margin : binormal * margin);
 
                         Gizmos.DrawLine(
@@ -172,7 +198,7 @@ namespace CsgTest
                     avg /= face.VertexCount;
 
                     UnityEditor.Handles.color = Gizmos.color;
-                    UnityEditor.Handles.Label(avg + face.Normal * index * 0.05f, $"face {index}");
+                    UnityEditor.Handles.Label(avg, $"face {index}");
 #endif
 
                     ++index;
@@ -300,11 +326,11 @@ namespace CsgTest
 
                     stats.VertexCount += _faceCuts.Count;
 
-                    if (_faceCuts.Count == 0) continue;
+                    if (_faceCuts.Count < 3) continue;
 
                     _faceCuts.Sort(FaceCut.Comparer);
 
-                    var firstVertex = (ushort) _vertices.Count;
+                    var firstVertex = (ushort) _vertexCount;
                     var vertexCount = (ushort) _faceCuts.Count;
                     var flipped = positiveLeaf == BspNode.InIndex;
                     var normal = plane.Normal * (positiveLeaf == BspNode.InIndex ? -1f : 1f);
@@ -312,9 +338,11 @@ namespace CsgTest
                     _faces.Add(new Face(firstVertex, vertexCount, flipped, normal));
                     _triangleCount += vertexCount - 2;
 
+                    Helpers.EnsureCapacity(ref _vertices, _vertexCount + _faceCuts.Count);
+
                     foreach (var cut in _faceCuts)
                     {
-                        _vertices.Add(cut.GetPoint(origin, tu, tv, cut.Max));
+                        _vertices[_vertexCount++] = cut.GetPoint(origin, tu, tv, cut.Max);
                     }
                 }
 
@@ -397,6 +425,24 @@ namespace CsgTest
                     return
                         $"{{ VertexCount: {VertexCount}, NegativeOut: {NegativeOut}, NegativeIn: {NegativeIn}, PositiveOut: {PositiveOut}, PositiveIn: {PositiveIn} }}";
                 }
+            }
+
+            ~MeshGenerator()
+            {
+                Dispose(false);
+            }
+
+            public void Dispose()
+            {
+                Dispose(true);
+                GC.SuppressFinalize(this);
+            }
+
+            private void Dispose(bool disposing)
+            {
+                if (_vertices.IsCreated) _vertices.Dispose();
+                if (_nodes.IsCreated) _nodes.Dispose();
+                if (_planes.IsCreated) _planes.Dispose();
             }
         }
 

@@ -109,6 +109,8 @@ namespace CsgTest
                         Transform(transform.Value);
                     }
 
+                    _verticesValid = false;
+
                     return;
                 }
             }
@@ -119,11 +121,14 @@ namespace CsgTest
                 throw new Exception();
             }
 
+            solid.UpdateVertices();
+
             var leafPlanes = _sMergePlanes ?? (_sMergePlanes = new Stack<BspPlane>());
 
             leafPlanes.Clear();
 
             var planes = transform == null ? solid._planes : new NativeArray<BspPlane>(solid._planes, Allocator.Temp);
+            var vertices = transform == null ? solid._vertices : new NativeArray<float3>(solid._vertices, Allocator.Temp);
 
             if (transform != null)
             {
@@ -133,51 +138,86 @@ namespace CsgTest
                 {
                     planes[i] = planes[i].Transform(transform.Value, normalTransform);
                 }
+
+                for (var i = 0; i < vertices.Length; ++i)
+                {
+                    vertices[i] = math.transform(transform.Value, vertices[i]);
+                }
             }
 
-            Merge(leafPlanes, 0, solid._nodes, 0, planes, op);
+            Merge(leafPlanes, vertices, solid._vertexCount, 0, solid._nodes, 0, planes, op);
 
             if (transform != null)
             {
                 planes.Dispose();
+                vertices.Dispose();
             }
-            
+
             Reduce();
+
+            _verticesValid = false;
         }
 
         [ThreadStatic] private static Stack<BspPlane> _sMergePlanes;
 
-        private void Merge(Stack<BspPlane> leafPlanes, ushort nodeIndex, NativeArray<BspNode> nodes, int rootIndex, NativeArray<BspPlane> planes, CsgOperator op)
+        private void Merge(Stack<BspPlane> leafPlanes, NativeArray<float3> vertices, int vertexCount, ushort nodeIndex, NativeArray<BspNode> nodes, int rootIndex, NativeArray<BspPlane> planes, CsgOperator op)
         {
             var node = _nodes[nodeIndex];
             var plane = _planes[node.PlaneIndex];
 
-            leafPlanes.Push(-plane);
+            var anyNegative = false;
+            var anyPositive = false;
 
-            if (BspNode.IsLeafIndex(node.NegativeIndex))
+            for (var i = 0; i < vertexCount; ++i)
             {
-                var (outValue, inValue) = GetLeafValues(op, node.NegativeIndex == BspNode.InIndex);
-                node = node.WithNegativeIndex(InsertSubtree(leafPlanes, nodeIndex, nodes, rootIndex, planes, outValue, inValue));
-            }
-            else
-            {
-                Merge(leafPlanes, node.NegativeIndex, nodes, rootIndex, planes, op);
-            }
+                var vertex = vertices[i];
+                var dist = math.dot(plane.Normal, vertex) - plane.Offset;
 
-            leafPlanes.Pop();
-            leafPlanes.Push(plane);
-
-            if (BspNode.IsLeafIndex(node.PositiveIndex))
-            {
-                var (outValue, inValue) = GetLeafValues(op, node.PositiveIndex == BspNode.InIndex);
-                node = node.WithPositiveIndex(InsertSubtree(leafPlanes, nodeIndex, nodes, rootIndex, planes, outValue, inValue));
-            }
-            else
-            {
-                Merge(leafPlanes, node.PositiveIndex, nodes, rootIndex, planes, op);
+                if (dist > 0.0001f)
+                {
+                    anyPositive = true;
+                    if (anyNegative) break;
+                }
+                else if (dist < -0.0001f)
+                {
+                    anyNegative = true;
+                    if (anyPositive) break;
+                }
             }
 
-            leafPlanes.Pop();
+            if (anyNegative)
+            {
+                leafPlanes.Push(-plane);
+
+                if (BspNode.IsLeafIndex(node.NegativeIndex))
+                {
+                    var (outValue, inValue) = GetLeafValues(op, node.NegativeIndex == BspNode.InIndex);
+                    node = node.WithNegativeIndex(InsertSubtree(leafPlanes, nodeIndex, nodes, rootIndex, planes, outValue, inValue));
+                }
+                else
+                {
+                    Merge(leafPlanes, vertices, vertexCount, node.NegativeIndex, nodes, rootIndex, planes, op);
+                }
+
+                leafPlanes.Pop();
+            }
+
+            if (anyPositive)
+            {
+                leafPlanes.Push(plane);
+
+                if (BspNode.IsLeafIndex(node.PositiveIndex))
+                {
+                    var (outValue, inValue) = GetLeafValues(op, node.PositiveIndex == BspNode.InIndex);
+                    node = node.WithPositiveIndex(InsertSubtree(leafPlanes, nodeIndex, nodes, rootIndex, planes, outValue, inValue));
+                }
+                else
+                {
+                    Merge(leafPlanes, vertices, vertexCount, node.PositiveIndex, nodes, rootIndex, planes, op);
+                }
+
+                leafPlanes.Pop();
+            }
 
             _nodes[nodeIndex] = node;
         }

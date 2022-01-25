@@ -120,6 +120,7 @@ namespace CsgTest
                 UnityEngine.Random.value * 0.25f + 1f);
 
             bspDemo.Subtract(float4x4.TRS(position, rotation, localScale));
+            bspDemo.LogInfo();
         }
 
         void FixedUpdate()
