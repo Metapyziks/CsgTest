@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Mathematics;
@@ -342,7 +342,7 @@ namespace CsgTest
                     {
                         positive = ((path >> pathIndex) & 1) == 1;
 
-                        if (!positive)
+                        if (path >> pathIndex == 0)
                         {
                             _pathQueue.Enqueue(path | (uint)(1 << pathIndex));
                         }
