@@ -1,4 +1,5 @@
 ﻿using System;
+using Newtonsoft.Json;
 using Unity.Mathematics;
 
 namespace CsgTest
@@ -10,7 +11,10 @@ namespace CsgTest
             return new BspPlane(-plane.Normal, -plane.Offset);
         }
 
+        [JsonProperty("normal")]
         public readonly float3 Normal;
+
+        [JsonProperty("offset")]
         public readonly float Offset;
 
         public BspPlane(float3 normalDir, float3 position)
@@ -19,6 +23,7 @@ namespace CsgTest
             Offset = math.dot(Normal, position);
         }
 
+        [JsonConstructor]
         public BspPlane(float3 normal, float offset)
         {
             Normal = normal;

@@ -21,36 +21,34 @@ namespace CsgTest
         }
 
         public readonly ushort PlaneIndex;
-        public readonly ushort ParentIndex;
         public readonly ushort NegativeIndex;
         public readonly ushort PositiveIndex;
 
-        public BspNode(ushort planeIndex, ushort parentIndex, ushort negativeIndex, ushort positiveIndex) =>
-            (PlaneIndex, ParentIndex, NegativeIndex, PositiveIndex) = (planeIndex, parentIndex, negativeIndex, positiveIndex);
+        public BspNode(ushort planeIndex, ushort negativeIndex, ushort positiveIndex) =>
+            (PlaneIndex, NegativeIndex, PositiveIndex) = (planeIndex, negativeIndex, positiveIndex);
 
         public BspNode WithNegativeIndex(ushort value)
         {
-            return new BspNode(PlaneIndex, ParentIndex, value, PositiveIndex);
+            return new BspNode(PlaneIndex, value, PositiveIndex);
         }
 
         public BspNode WithPositiveIndex(ushort value)
         {
-            return new BspNode(PlaneIndex, ParentIndex, NegativeIndex, value);
+            return new BspNode(PlaneIndex, NegativeIndex, value);
+        }
+
+        public BspNode WithPlaneIndex(ushort value)
+        {
+            return new BspNode(value, NegativeIndex, PositiveIndex);
         }
 
         public BspNode Remapped(Dictionary<ushort, ushort> nodeRemapDict)
         {
             return new BspNode(PlaneIndex,
-                ParentIndex == NullParentIndex ? NullParentIndex : nodeRemapDict[ParentIndex],
                 IsLeafIndex(NegativeIndex) ? NegativeIndex : nodeRemapDict[NegativeIndex],
                 IsLeafIndex(PositiveIndex) ? PositiveIndex : nodeRemapDict[PositiveIndex]);
         }
-
-        private static string ParentToString(ushort parentIndex)
-        {
-            return parentIndex == NullParentIndex ? "NULL" : $"N{parentIndex:000}";
-        }
-
+        
         private static string ChildToString(ushort childIndex)
         {
             switch (childIndex)
@@ -63,7 +61,7 @@ namespace CsgTest
 
         public override string ToString()
         {
-            return $"{{ Plane: P{PlaneIndex:000}, Parent: {ParentToString(ParentIndex)}, Negative: {ChildToString(NegativeIndex)}, Positive: {ChildToString(PositiveIndex)} }}";
+            return $"{{ Plane: P{PlaneIndex:000}, Negative: {ChildToString(NegativeIndex)}, Positive: {ChildToString(PositiveIndex)} }}";
         }
     }
 }

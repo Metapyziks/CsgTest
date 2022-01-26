@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using Unity.Mathematics;
 using UnityEngine;
+using Debug = UnityEngine.Debug;
 
 namespace CsgTest
 {
@@ -19,6 +21,8 @@ namespace CsgTest
         [Multiline(32)]
         public string value;
 
+        private string _oldValue;
+
         public List<int> debugNodes;
         public bool debugDraw;
 
@@ -27,9 +31,6 @@ namespace CsgTest
 
         void OnEnable()
         {
-            _solid?.Dispose();
-            _cube?.Dispose();
-
             _solid = new BspSolid();
             _cube = BspSolid.CreateBox(float3.zero, new float3(1f, 1f, 1f));
             _dodecahedron = BspSolid.CreateDodecahedron(float3.zero, 0.5f);
@@ -58,21 +59,28 @@ namespace CsgTest
 
         public void Subtract(float4x4 matrix)
         {
+            var timer = new Stopwatch();
+            timer.Start();
+
             _solid.Merge(_dodecahedron, CsgOperator.Subtract, matrix);
+
+            Debug.Log($"Merge: {timer.Elapsed.TotalMilliseconds:F3}ms");
 
             _meshInvalid = true;
         }
 
-        void OnDisable()
+        void OnValidate()
         {
-            _solid?.Dispose();
-            _solid = null;
+            if (_oldValue != value)
+            {
+                _oldValue = value;
 
-            _cube?.Dispose();
-            _cube = null;
-
-            _dodecahedron?.Dispose();
-            _dodecahedron = null;
+                if (_solid != null && value != null)
+                {
+                    _solid.FromJson(value);
+                    _meshInvalid = true;
+                }
+            }
         }
 
         void Update()
@@ -101,7 +109,10 @@ namespace CsgTest
                 }
 
 #if UNITY_EDITOR
-                value = _solid.ToString();
+                if (!UnityEditor.EditorApplication.isPlaying)
+                {
+                    UpdateValue();
+                }
 #endif
 
                 _meshInvalid = true;
@@ -110,7 +121,14 @@ namespace CsgTest
             if (_meshInvalid)
             {
                 _meshInvalid = false;
+
+                var timer = new Stopwatch();
+
+                timer.Start();
+
                 _solid.WriteToMesh(_mesh);
+
+                Debug.Log($"Mesh: {timer.Elapsed.TotalMilliseconds:F3}ms");
 
                 if (_collider != null)
                 {
@@ -119,11 +137,18 @@ namespace CsgTest
             }
         }
 
+        private void UpdateValue()
+        {
+            value = _solid.ToString();
+            _oldValue = value;
+        }
+
         void OnDrawGizmos()
         {
             if (debugDraw)
             {
                 _solid.DrawDebugNodes(debugNodes ?? Enumerable.Empty<int>());
+                UpdateValue();
             }
         }
 

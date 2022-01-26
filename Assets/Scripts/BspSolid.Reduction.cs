@@ -18,8 +18,6 @@ namespace CsgTest
         {
             if (_nodeCount == 0) return;
 
-            // First pass, remove disconnected nodes
-
             var nodeRemapDict = _sNodeRemapDict ?? (_sNodeRemapDict = new Dictionary<ushort, ushort>());
 
             nodeRemapDict.Clear();
@@ -34,6 +32,8 @@ namespace CsgTest
 
             var oldNodes = new NativeArray<BspNode>(_nodeCount, Allocator.Temp);
 
+            _planeDict.Clear();
+
             try
             {
                 NativeArray<BspNode>.Copy(_nodes, 0, oldNodes, 0, _nodeCount);
@@ -41,7 +41,27 @@ namespace CsgTest
                 for (ushort oldIndex = 0; oldIndex < _nodeCount; ++oldIndex)
                 {
                     if (!nodeRemapDict.TryGetValue(oldIndex, out var newIndex)) continue;
-                    _nodes[newIndex] = oldNodes[oldIndex].Remapped(nodeRemapDict);
+
+                    var oldNode = oldNodes[oldIndex];
+                    var plane = _planes[oldNode.PlaneIndex];
+
+                    if (_planeDict.TryGetValue(plane, out var planeIndex))
+                    {
+
+                    }
+                    else if (_planeDict.TryGetValue(-plane, out planeIndex))
+                    {
+                        oldNode = -oldNode;
+                    }
+                    else
+                    {
+                        planeIndex = (ushort) _planeDict.Count;
+                        _planeDict.Add(plane, planeIndex);
+                    }
+
+                    oldNode = oldNode.WithPlaneIndex(planeIndex);
+
+                    _nodes[newIndex] = oldNode.Remapped(nodeRemapDict);
                 }
 
                 _nodeCount = nodeRemapDict.Count;
@@ -49,6 +69,13 @@ namespace CsgTest
             finally
             {
                 oldNodes.Dispose();
+            }
+
+            _planeCount = _planeDict.Count;
+
+            foreach (var pair in _planeDict)
+            {
+                _planes[pair.Value] = pair.Key;
             }
         }
 

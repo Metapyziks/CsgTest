@@ -450,6 +450,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 4943742206079196393, guid: 1162f20cf9a412c4fb8575b2950fa3df, type: 3}
+      propertyPath: SubtractSize
+      value: 2.5
+      objectReference: {fileID: 0}
     - target: {fileID: 9030550656006735617, guid: 1162f20cf9a412c4fb8575b2950fa3df, type: 3}
       propertyPath: m_Name
       value: Player
@@ -480,13 +484,13 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1424346740}
-  m_LocalRotation: {x: 0, y: 0.38268343, z: 0, w: 0.92387956}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 2, z: 0}
   m_LocalScale: {x: 16, y: 6, z: 16}
   m_Children: []
   m_Father: {fileID: 1698812946}
   m_RootOrder: 1
-  m_LocalEulerAnglesHint: {x: 0, y: 45, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1424346742
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -533,43 +537,25 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 044ec0bdc348d654dbfa6ae290ce0cb7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  value: "NODE 0: PLANE 0 { Normal: float3(1f, 0f, 0f), Offset: -9 }\r\n- NODE 1:
-    PLANE 12 { Normal: float3(1f, 0f, 0f), Offset: -64 }\r\n  - OUT\r\n  + NODE 2:
-    PLANE 13 { Normal: float3(0f, 1f, 0f), Offset: -8 }\r\n    - OUT\r\n    + NODE
-    3: PLANE 14 { Normal: float3(0f, -1f, 0f), Offset: 0 }\r\n      - OUT\r\n     
-    + NODE 4: PLANE 15 { Normal: float3(0f, 0f, 1f), Offset: -64 }\r\n        - OUT\r\n       
-    + NODE 5: PLANE 16 { Normal: float3(0f, 0f, -1f), Offset: -64 }\r\n         
-    - OUT\r\n          + IN\r\n+ NODE 6: PLANE 1 { Normal: float3(-1f, 0f, 0f), Offset:
-    -9 }\r\n  - NODE 7: PLANE 17 { Normal: float3(-1f, 0f, 0f), Offset: -64 }\r\n   
-    - OUT\r\n    + NODE 8: PLANE 13 { Normal: float3(0f, 1f, 0f), Offset: -8 }\r\n     
-    - OUT\r\n      + NODE 9: PLANE 14 { Normal: float3(0f, -1f, 0f), Offset: 0 }\r\n       
-    - OUT\r\n        + NODE 10: PLANE 15 { Normal: float3(0f, 0f, 1f), Offset: -64
-    }\r\n          - OUT\r\n          + NODE 11: PLANE 16 { Normal: float3(0f, 0f,
-    -1f), Offset: -64 }\r\n            - OUT\r\n            + IN\r\n  + NODE 12:
-    PLANE 2 { Normal: float3(0f, 1f, 0f), Offset: -2 }\r\n    - NODE 13: PLANE 13
-    { Normal: float3(0f, 1f, 0f), Offset: -8 }\r\n      - OUT\r\n      + NODE 14:
-    PLANE 15 { Normal: float3(0f, 0f, 1f), Offset: -64 }\r\n        - OUT\r\n       
-    + NODE 15: PLANE 16 { Normal: float3(0f, 0f, -1f), Offset: -64 }\r\n         
-    - OUT\r\n          + IN\r\n    + NODE 16: PLANE 3 { Normal: float3(0f, -1f, 0f),
-    Offset: -6 }\r\n      - OUT\r\n      + NODE 17: PLANE 4 { Normal: float3(0f,
-    0f, 1f), Offset: -9 }\r\n        - NODE 18: PLANE 14 { Normal: float3(0f, -1f,
-    0f), Offset: 0 }\r\n          - OUT\r\n          + NODE 19: PLANE 15 { Normal:
-    float3(0f, 0f, 1f), Offset: -64 }\r\n            - OUT\r\n            + IN\r\n       
-    + NODE 20: PLANE 5 { Normal: float3(0f, 0f, -1f), Offset: -9 }\r\n          -
-    NODE 21: PLANE 14 { Normal: float3(0f, -1f, 0f), Offset: 0 }\r\n            -
-    OUT\r\n            + NODE 22: PLANE 16 { Normal: float3(0f, 0f, -1f), Offset:
-    -64 }\r\n              - OUT\r\n              + IN\r\n          + NODE 23: PLANE
-    6 { Normal: float3(0.7071068f, 0f, -0.7071068f), Offset: -8 }\r\n           
-    - IN\r\n            + NODE 24: PLANE 7 { Normal: float3(-0.7071068f, 0f, 0.7071068f),
-    Offset: -8 }\r\n              - IN\r\n              + NODE 25: PLANE 8 { Normal:
-    float3(0f, 1f, 0f), Offset: -1 }\r\n                - IN\r\n                +
-    NODE 26: PLANE 9 { Normal: float3(0f, -1f, 0f), Offset: -5 }\r\n                 
-    - IN\r\n                  + NODE 27: PLANE 10 { Normal: float3(0.7071068f, 0f,
-    0.7071068f), Offset: -8 }\r\n                    - IN\r\n                   
-    + NODE 28: PLANE 11 { Normal: float3(-0.7071068f, 0f, -0.7071068f), Offset: -8
-    }\r\n                      - IN\r\n                      + NODE 29: PLANE 14
-    { Normal: float3(0f, -1f, 0f), Offset: 0 }\r\n                        - OUT\r\n                       
-    + IN\r\n"
+  value: "NODE 0: PLANE 0\r\n- NODE 1: PLANE 12\r\n  - OUT\r\n  + NODE 2: PLANE 13\r\n   
+    - OUT\r\n    + NODE 3: PLANE 14\r\n      - OUT\r\n      + NODE 4: PLANE 15\r\n       
+    - OUT\r\n        + NODE 5: PLANE 16\r\n          - OUT\r\n          + IN\r\n+
+    NODE 6: PLANE 1\r\n  - NODE 7: PLANE 17\r\n    - OUT\r\n    + NODE 8: PLANE 13\r\n     
+    - OUT\r\n      + NODE 9: PLANE 14\r\n        - OUT\r\n        + NODE 10: PLANE
+    15\r\n          - OUT\r\n          + NODE 11: PLANE 16\r\n            - OUT\r\n           
+    + IN\r\n  + NODE 12: PLANE 2\r\n    - NODE 13: PLANE 13\r\n      - OUT\r\n     
+    + NODE 14: PLANE 15\r\n        - OUT\r\n        + NODE 15: PLANE 16\r\n         
+    - OUT\r\n          + IN\r\n    + NODE 16: PLANE 3\r\n      - OUT\r\n      + NODE
+    17: PLANE 4\r\n        - NODE 18: PLANE 14\r\n          - OUT\r\n          +
+    NODE 19: PLANE 15\r\n            - OUT\r\n            + IN\r\n        + NODE
+    20: PLANE 5\r\n          - NODE 21: PLANE 14\r\n            - OUT\r\n           
+    + NODE 22: PLANE 16\r\n              - OUT\r\n              + IN\r\n         
+    + NODE 23: PLANE 6\r\n            - IN\r\n            + NODE 24: PLANE 7\r\n             
+    - IN\r\n              + NODE 25: PLANE 8\r\n                - IN\r\n               
+    + NODE 26: PLANE 9\r\n                  - IN\r\n                  + NODE 27:
+    PLANE 10\r\n                    - IN\r\n                    + NODE 28: PLANE
+    11\r\n                      - IN\r\n                      + NODE 29: PLANE 14\r\n                       
+    - OUT\r\n                        + IN\r\n"
   debugNodes: 
   debugDraw: 0
 --- !u!33 &1698812945

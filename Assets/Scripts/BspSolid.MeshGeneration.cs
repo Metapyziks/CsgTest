@@ -24,7 +24,7 @@ namespace CsgTest
             }
         }
 
-        private class MeshGenerator : IDisposable
+        private class MeshGenerator
         {
             private readonly HashSet<uint> _pathSet = new HashSet<uint>();
             private readonly Queue<uint> _pathQueue = new Queue<uint>();
@@ -36,9 +36,9 @@ namespace CsgTest
             private readonly List<FaceCut> _nodeCuts = new List<FaceCut>();
             private readonly List<FaceCut> _faceCuts = new List<FaceCut>();
 
-            private NativeArray<float3> _vertices;
-            private NativeArray<BspNode> _nodes;
-            private NativeArray<BspPlane> _planes;
+            private Vector3[] _vertices;
+            private BspNode[] _nodes;
+            private BspPlane[] _planes;
 
             private int _vertexCount;
             private int _triangleCount;
@@ -105,15 +105,6 @@ namespace CsgTest
                 }
 
                 return new Bounds((min + max) * 0.5f, max - min);
-            }
-
-            public int VertexCount => _vertexCount;
-
-            public void CopyVertices(NativeArray<float3> dst)
-            {
-                if (_vertexCount == 0) return;
-
-                NativeArray<float3>.Copy(_vertices, 0, dst, 0, _vertexCount);
             }
 
             public void CopyToMesh(Mesh mesh)
@@ -217,6 +208,11 @@ namespace CsgTest
                 if (!_enableIndexFilter || _indexFilter.Count == 0 || _indexFilter.Contains(index))
                 {
                     stats += TriangulateFace(planes, node);
+
+                    if (stats.VertexCount == 0)
+                    {
+                        Debug.Log($"No verts: {index}");
+                    }
                 }
 
                 if (!BspNode.IsLeafIndex(node.NegativeIndex))
@@ -425,24 +421,6 @@ namespace CsgTest
                     return
                         $"{{ VertexCount: {VertexCount}, NegativeOut: {NegativeOut}, NegativeIn: {NegativeIn}, PositiveOut: {PositiveOut}, PositiveIn: {PositiveIn} }}";
                 }
-            }
-
-            ~MeshGenerator()
-            {
-                Dispose(false);
-            }
-
-            public void Dispose()
-            {
-                Dispose(true);
-                GC.SuppressFinalize(this);
-            }
-
-            private void Dispose(bool disposing)
-            {
-                if (_vertices.IsCreated) _vertices.Dispose();
-                if (_nodes.IsCreated) _nodes.Dispose();
-                if (_planes.IsCreated) _planes.Dispose();
             }
         }
 

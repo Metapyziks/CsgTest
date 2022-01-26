@@ -25,19 +25,18 @@ namespace CsgTest
             return a.x * b.y - a.y * b.x;
         }
 
-        public static void EnsureCapacity<T>(ref NativeArray<T> array, int minSize)
+        public static void EnsureCapacity<T>(ref T[] array, int minSize)
             where T : struct
         {
-            if (array.IsCreated && array.Length >= minSize) return;
+            if (array != null && array.Length >= minSize) return;
 
             var oldArray = array;
 
-            array = new NativeArray<T>(Mathf.NextPowerOfTwo(minSize), Allocator.Persistent);
+            array = new T[Mathf.NextPowerOfTwo(minSize)];
 
-            if (oldArray.IsCreated)
+            if (oldArray != null)
             {
-                NativeArray<T>.Copy(oldArray, 0, array, 0, oldArray.Length);
-                oldArray.Dispose();
+                Array.Copy(oldArray, 0, array, 0, oldArray.Length);
             }
         }
         

@@ -2,8 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using Codice.CM.Client.Differences;
+using Newtonsoft.Json;
 using Unity.Collections;
 using UnityEngine;
 
@@ -11,42 +10,22 @@ using Unity.Mathematics;
 
 namespace CsgTest
 {
-    public partial class BspSolid : IDisposable
+    public partial class BspSolid
     {
-        private NativeArray<BspPlane> _planes;
-        private NativeArray<BspNode> _nodes;
+        private BspPlane[] _planes;
+        private BspNode[] _nodes;
 
         private readonly Dictionary<BspPlane, ushort> _planeDict = new Dictionary<BspPlane, ushort>();
 
         private int _planeCount;
         private int _nodeCount;
 
-        private bool _verticesValid;
-        private int _vertexCount;
-        private NativeArray<float3> _vertices;
-
-        private void UpdateVertices()
-        {
-            if (_verticesValid) return;
-
-            var meshGen = GetMeshGenerator();
-
-            meshGen.Write(this);
-
-            _vertexCount = meshGen.VertexCount;
-
-            Helpers.EnsureCapacity(ref _vertices, _vertexCount);
-            meshGen.CopyVertices(_vertices);
-
-            _verticesValid = true;
-        }
-
         public static BspSolid CreateBox(float3 center, float3 size)
         {
             var mesh = new BspSolid
             {
-                _planes = new NativeArray<BspPlane>(6, Allocator.Persistent),
-                _nodes = new NativeArray<BspNode>(6, Allocator.Persistent)
+                _planes = new BspPlane[6],
+                _nodes = new BspNode[6]
             };
 
             var min = center - size * 0.5f;
@@ -66,8 +45,8 @@ namespace CsgTest
         {
             var mesh = new BspSolid
             {
-                _planes = new NativeArray<BspPlane>(12, Allocator.Persistent),
-                _nodes = new NativeArray<BspNode>(12, Allocator.Persistent)
+                _planes = new BspPlane[12],
+                _nodes = new BspNode[12]
             };
 
             mesh.Cut(new BspPlane(new float3(0f, 1f, 0f), -radius));
@@ -92,8 +71,6 @@ namespace CsgTest
             _planeCount = 0;
 
             _planeDict.Clear();
-
-            _verticesValid = false;
         }
 
         private (ushort Index, bool flipped) AddPlane(BspPlane plane)
@@ -123,7 +100,7 @@ namespace CsgTest
             return (index, false);
         }
 
-        private ushort AddNode(ushort planeIndex, ushort parentIndex, ushort negativeIndex, ushort positiveIndex)
+        private ushort AddNode(ushort planeIndex, ushort negativeIndex, ushort positiveIndex)
         {
             if (_nodeCount >= ushort.MaxValue - 1)
             {
@@ -132,8 +109,7 @@ namespace CsgTest
 
             Helpers.EnsureCapacity(ref _nodes, _nodeCount + 1);
 
-            _nodes[_nodeCount] = new BspNode(planeIndex, parentIndex, negativeIndex, positiveIndex);
-            _verticesValid = false;
+            _nodes[_nodeCount] = new BspNode(planeIndex, negativeIndex, positiveIndex);
 
             return (ushort)_nodeCount++;
         }
@@ -146,95 +122,11 @@ namespace CsgTest
             {
                 _planes[i] = _planes[i].Transform(matrix, transInvMatrix);
             }
-
-            _verticesValid = false;
-        }
-
-        public void Dispose()
-        {
-            if (_planes.IsCreated)
-            {
-                _planes.Dispose();
-            }
-
-            _planeCount = 0;
-
-            if (_nodes.IsCreated)
-            {
-                _nodes.Dispose();
-            }
-
-            _nodeCount = 0;
-
-            if (_vertices.IsCreated)
-            {
-                _vertices.Dispose();
-            }
-
-            _vertexCount = 0;
-            _verticesValid = false;
         }
 
         public override string ToString()
         {
-            if (_nodeCount == 0)
-            {
-                return "Empty";
-            }
-
-            var writer = new StringWriter();
-
-            WriteNode(writer, 0, 0);
-
-            return writer.ToString();
-        }
-
-        private void WriteIndentation(StringWriter writer, int depth)
-        {
-            for (var i = 0; i < depth; ++i)
-            {
-                writer.Write("  ");
-            }
-        }
-
-        private void WriteNode(StringWriter writer, ushort index, int depth)
-        {
-            var node = _nodes[index];
-
-            var plane = _planes[node.PlaneIndex];
-            writer.WriteLine($"NODE {index}: PLANE {node.PlaneIndex} {plane}");
-
-            WriteIndentation(writer, depth);
-            writer.Write("- ");
-
-            switch (node.NegativeIndex)
-            {
-                case BspNode.OutIndex:
-                    writer.WriteLine("OUT");
-                    break;
-                case BspNode.InIndex:
-                    writer.WriteLine("IN");
-                    break;
-                default:
-                    WriteNode(writer, node.NegativeIndex, depth + 1);
-                    break;
-            }
-
-            WriteIndentation(writer, depth);
-            writer.Write("+ ");
-
-            switch (node.PositiveIndex)
-            {
-                case BspNode.OutIndex:
-                    writer.WriteLine("OUT");
-                    break;
-                case BspNode.InIndex:
-                    writer.WriteLine("IN");
-                    break;
-                default:
-                    WriteNode(writer, node.PositiveIndex, depth + 1);
-                    break;
-            }
+            return ToJson(Formatting.Indented);
         }
 
         public void LogInfo()

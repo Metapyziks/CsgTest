@@ -35,6 +35,8 @@ namespace CsgTest
 
         public GameObject FlarePrefab;
 
+        public float SubtractSize = 2.5f;
+
         void Start()
         {
             _characterController = GetComponent<CharacterController>();
@@ -115,9 +117,9 @@ namespace CsgTest
 
             var position = hitInfo.point;
             var rotation = UnityEngine.Random.rotationUniform;
-            var localScale = new Vector3(UnityEngine.Random.value * 0.25f + 2.5f,
-                UnityEngine.Random.value * 0.25f + 2.5f,
-                UnityEngine.Random.value * 0.25f + 2.5f);
+            var localScale = new Vector3(UnityEngine.Random.value * 0.125f + 1f,
+                UnityEngine.Random.value * 0.125f + 1f,
+                UnityEngine.Random.value * 0.125f + 1f) * SubtractSize;
 
             bspDemo.Subtract(float4x4.TRS(position, rotation, localScale));
             bspDemo.LogInfo();
