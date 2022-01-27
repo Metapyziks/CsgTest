@@ -44,7 +44,7 @@ namespace CsgTest
             private int _triangleCount;
 
             private bool _enableIndexFilter;
-            private readonly HashSet<ushort> _indexFilter = new HashSet<ushort>();
+            private readonly HashSet<int> _indexFilter = new HashSet<int>();
 
             public void Clear()
             {
@@ -89,7 +89,7 @@ namespace CsgTest
                 if (solid._nodeCount == 0) return;
 
                 Init(solid);
-                TriangulateFaces(_planeStack, 0);
+                TriangulateFaces(_planeStack, solid._rootIndex);
                 CleanUp();
             }
 
@@ -196,13 +196,13 @@ namespace CsgTest
                 }
             }
 
-            private TriangulationStats TriangulateFaces(Stack<BspPlane> planes, ushort index)
+            private TriangulationStats TriangulateFaces(Stack<BspPlane> planes, NodeIndex index)
             {
+                if (index.IsLeaf) return default;
+
                 var node = _nodes[index];
-
-                if (node.NegativeIndex == node.PositiveIndex && BspNode.IsLeafIndex(node.NegativeIndex)) return default;
-
                 var plane = _planes[node.PlaneIndex];
+
                 TriangulationStats stats = default;
 
                 if (!_enableIndexFilter || _indexFilter.Count == 0 || _indexFilter.Contains(index))
@@ -214,20 +214,14 @@ namespace CsgTest
                         Debug.Log($"No verts: {index}");
                     }
                 }
+                
+                planes.Push(-plane);
+                stats += TriangulateFaces(planes, node.NegativeIndex);
+                planes.Pop();
 
-                if (!BspNode.IsLeafIndex(node.NegativeIndex))
-                {
-                    planes.Push(-plane);
-                    stats += TriangulateFaces(planes, node.NegativeIndex);
-                    planes.Pop();
-                }
-
-                if (!BspNode.IsLeafIndex(node.PositiveIndex))
-                {
-                    planes.Push(plane);
-                    stats += TriangulateFaces(planes, node.PositiveIndex);
-                    planes.Pop();
-                }
+                planes.Push(plane);
+                stats += TriangulateFaces(planes, node.PositiveIndex);
+                planes.Pop();
 
                 return stats;
             }
@@ -259,48 +253,30 @@ namespace CsgTest
                 {
                     var path = _pathQueue.Dequeue();
 
-                    if (!_pathSet.Add(path)) continue;
+                    if (!_pathSet.Add(path))
+                    {
+                        continue;
+                    }
 
                     _faceCuts.Clear();
                     _faceCuts.AddRange(_nodeCuts);
 
                     var pathIndex = 0;
-                    var negativeLeaf = node.NegativeIndex;
-                    var positiveLeaf = node.PositiveIndex;
+                    var negativeLeaf = HandleChildCuts(plane, origin, tu, tv, node.NegativeIndex, path,
+                        ref pathIndex);
+                    var positiveLeaf = HandleChildCuts(plane, origin, tu, tv, node.PositiveIndex, path,
+                        ref pathIndex);
 
-                    bool valid;
+                    if (!negativeLeaf.IsLeaf || !positiveLeaf.IsLeaf)
+                    {
+                        continue;
+                    }
+                    
+                    stats.NegativeOut |= negativeLeaf.IsOut;
+                    stats.NegativeIn |= negativeLeaf.IsIn;
 
-                    if (!BspNode.IsLeafIndex(negativeLeaf))
-                    {
-                        (valid, negativeLeaf) = HandleChildCuts(plane, origin, tu, tv, _nodes[negativeLeaf], path,
-                            ref pathIndex);
-                        if (!valid) continue;
-                    }
-
-                    if (!BspNode.IsLeafIndex(positiveLeaf))
-                    {
-                        (valid, positiveLeaf) = HandleChildCuts(plane, origin, tu, tv, _nodes[positiveLeaf], path,
-                            ref pathIndex);
-                        if (!valid) continue;
-                    }
-
-                    if (negativeLeaf == BspNode.OutIndex)
-                    {
-                        stats.NegativeOut = true;
-                    }
-                    else
-                    {
-                        stats.NegativeIn = true;
-                    }
-
-                    if (positiveLeaf == BspNode.OutIndex)
-                    {
-                        stats.PositiveOut = true;
-                    }
-                    else
-                    {
-                        stats.PositiveIn = true;
-                    }
+                    stats.PositiveOut |= positiveLeaf.IsOut;
+                    stats.PositiveIn |= positiveLeaf.IsIn;
 
                     if (!_enableIndexFilter && negativeLeaf == positiveLeaf) continue;
 
@@ -320,16 +296,16 @@ namespace CsgTest
                         }
                     }
 
-                    stats.VertexCount += _faceCuts.Count;
-
                     if (_faceCuts.Count < 3) continue;
+
+                    stats.VertexCount += _faceCuts.Count;
 
                     _faceCuts.Sort(FaceCut.Comparer);
 
                     var firstVertex = (ushort) _vertexCount;
                     var vertexCount = (ushort) _faceCuts.Count;
-                    var flipped = positiveLeaf == BspNode.InIndex;
-                    var normal = plane.Normal * (positiveLeaf == BspNode.InIndex ? -1f : 1f);
+                    var flipped = positiveLeaf.IsIn;
+                    var normal = plane.Normal * (positiveLeaf.IsIn ? -1f : 1f);
 
                     _faces.Add(new Face(firstVertex, vertexCount, flipped, normal));
                     _triangleCount += vertexCount - 2;
@@ -345,12 +321,18 @@ namespace CsgTest
                 return stats;
             }
 
-            private (bool, ushort) HandleChildCuts(BspPlane plane, float3 origin, float3 tu, float3 tv, BspNode child, uint path, ref int pathIndex)
+            private NodeIndex HandleChildCuts(BspPlane plane, float3 origin, float3 tu, float3 tv, NodeIndex index, uint path, ref int pathIndex)
             {
                 while (true)
                 {
+                    if (index.IsLeaf)
+                    {
+                        return index;
+                    }
+
                     bool positive;
 
+                    var child = _nodes[index];
                     var childPlane = _planes[child.PlaneIndex];
                     var positiveCut = Helpers.GetFaceCut(plane, childPlane, origin, tu, tv);
                     var negativeCut = -positiveCut;
@@ -359,7 +341,7 @@ namespace CsgTest
 
                     if (negExcludesAll && posExcludesAll)
                     {
-                        return (false, default);
+                        return default;
                     }
 
                     if (!negExcludesAll && !posExcludesAll)
@@ -383,14 +365,7 @@ namespace CsgTest
                         _faceCuts.AddFaceCut(positive ? positiveCut : negativeCut);
                     }
 
-                    var nextIndex = positive ? child.PositiveIndex : child.NegativeIndex;
-
-                    if (BspNode.IsLeafIndex(nextIndex))
-                    {
-                        return (true, nextIndex);
-                    }
-
-                    child = _nodes[nextIndex];
+                    index = positive ? child.PositiveIndex : child.NegativeIndex;
                 }
             }
 

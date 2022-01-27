@@ -70,7 +70,7 @@ namespace CsgTest
             var root = new JsonSolid
             {
                 Planes = new JsonPlane[_planeCount],
-                Root = ToJsonNode(0, true)
+                Root = ToJsonNode(_nodeCount == 0 ? NodeIndex.Out : (NodeIndex) 0)
             };
 
             for (var i = 0; i < _planeCount; ++i)
@@ -113,21 +113,13 @@ namespace CsgTest
             Reduce();
         }
 
-        private JsonNode ToJsonNode(ushort index, bool isRoot)
+        private JsonNode ToJsonNode(NodeIndex index)
         {
-            if (_nodeCount == 0)
+            if (index.IsLeaf)
             {
                 return new JsonNode
                 {
-                    Type = JsonNodeType.Out
-                };
-            }
-
-            if (!isRoot && BspNode.IsLeafIndex(index))
-            {
-                return new JsonNode
-                {
-                    Type = index == BspNode.OutIndex ? JsonNodeType.Out : JsonNodeType.In
+                    Type = index.IsIn ? JsonNodeType.In : JsonNodeType.Out
                 };
             }
 
@@ -139,30 +131,30 @@ namespace CsgTest
                 PlaneIndex = node.PlaneIndex,
                 Type = JsonNodeType.Branch,
 
-                Negative = ToJsonNode(node.NegativeIndex, false),
-                Positive = ToJsonNode(node.PositiveIndex, false)
+                Negative = ToJsonNode(node.NegativeIndex),
+                Positive = ToJsonNode(node.PositiveIndex)
             };
         }
 
-        private ushort AddJsonNode(JsonNode jsonNode)
+        private NodeIndex AddJsonNode(JsonNode jsonNode)
         {
             switch (jsonNode.Type)
             {
                 case JsonNodeType.Out:
-                    return BspNode.OutIndex;
+                    return NodeIndex.Out;
 
                 case JsonNodeType.In:
-                    return BspNode.InIndex;
+                    return NodeIndex.In;
             }
 
-            var index = AddNode((ushort) jsonNode.PlaneIndex, BspNode.OutIndex, BspNode.OutIndex);
+            var index = AddNode((ushort) jsonNode.PlaneIndex, NodeIndex.Out, NodeIndex.Out);
 
             var node = _nodes[index];
 
             node = node.WithNegativeIndex(AddJsonNode(jsonNode.Negative));
             node = node.WithPositiveIndex(AddJsonNode(jsonNode.Positive));
 
-            if (BspNode.IsLeafIndex(node.NegativeIndex) && node.NegativeIndex == node.PositiveIndex)
+            if (node.NegativeIndex == node.PositiveIndex)
             {
                 return node.NegativeIndex;
             }

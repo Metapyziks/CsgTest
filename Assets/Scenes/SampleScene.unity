@@ -152,7 +152,7 @@ Transform:
   m_LocalScale: {x: 128, y: 8, z: 128}
   m_Children: []
   m_Father: {fileID: 1698812946}
-  m_RootOrder: 2
+  m_RootOrder: 1
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &363557538
 MonoBehaviour:
@@ -416,7 +416,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1380967429039715679, guid: 1162f20cf9a412c4fb8575b2950fa3df, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 1
+      value: 9.29
       objectReference: {fileID: 0}
     - target: {fileID: 1380967429039715679, guid: 1162f20cf9a412c4fb8575b2950fa3df, type: 3}
       propertyPath: m_LocalPosition.z
@@ -460,51 +460,6 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 1162f20cf9a412c4fb8575b2950fa3df, type: 3}
---- !u!1 &1424346740
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1424346741}
-  - component: {fileID: 1424346742}
-  m_Layer: 0
-  m_Name: Inside
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1424346741
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1424346740}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 2, z: 0}
-  m_LocalScale: {x: 16, y: 6, z: 16}
-  m_Children: []
-  m_Father: {fileID: 1698812946}
-  m_RootOrder: 1
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1424346742
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1424346740}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7ddd2cb5e83ee7545bf4c04b89caa879, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  Operator: 1
-  Primitive: 0
 --- !u!1 &1698812943
 GameObject:
   m_ObjectHideFlags: 0
@@ -537,25 +492,69 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 044ec0bdc348d654dbfa6ae290ce0cb7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  value: "NODE 0: PLANE 0\r\n- NODE 1: PLANE 12\r\n  - OUT\r\n  + NODE 2: PLANE 13\r\n   
-    - OUT\r\n    + NODE 3: PLANE 14\r\n      - OUT\r\n      + NODE 4: PLANE 15\r\n       
-    - OUT\r\n        + NODE 5: PLANE 16\r\n          - OUT\r\n          + IN\r\n+
-    NODE 6: PLANE 1\r\n  - NODE 7: PLANE 17\r\n    - OUT\r\n    + NODE 8: PLANE 13\r\n     
-    - OUT\r\n      + NODE 9: PLANE 14\r\n        - OUT\r\n        + NODE 10: PLANE
-    15\r\n          - OUT\r\n          + NODE 11: PLANE 16\r\n            - OUT\r\n           
-    + IN\r\n  + NODE 12: PLANE 2\r\n    - NODE 13: PLANE 13\r\n      - OUT\r\n     
-    + NODE 14: PLANE 15\r\n        - OUT\r\n        + NODE 15: PLANE 16\r\n         
-    - OUT\r\n          + IN\r\n    + NODE 16: PLANE 3\r\n      - OUT\r\n      + NODE
-    17: PLANE 4\r\n        - NODE 18: PLANE 14\r\n          - OUT\r\n          +
-    NODE 19: PLANE 15\r\n            - OUT\r\n            + IN\r\n        + NODE
-    20: PLANE 5\r\n          - NODE 21: PLANE 14\r\n            - OUT\r\n           
-    + NODE 22: PLANE 16\r\n              - OUT\r\n              + IN\r\n         
-    + NODE 23: PLANE 6\r\n            - IN\r\n            + NODE 24: PLANE 7\r\n             
-    - IN\r\n              + NODE 25: PLANE 8\r\n                - IN\r\n               
-    + NODE 26: PLANE 9\r\n                  - IN\r\n                  + NODE 27:
-    PLANE 10\r\n                    - IN\r\n                    + NODE 28: PLANE
-    11\r\n                      - IN\r\n                      + NODE 29: PLANE 14\r\n                       
-    - OUT\r\n                        + IN\r\n"
+  value: "{\r\n  \"planes\": [\r\n    {\r\n      \"normalX\": 1.0,\r\n      \"offset\":
+    -9.0\r\n    },\r\n    {\r\n      \"normalX\": -1.0,\r\n      \"offset\": -9.0\r\n   
+    },\r\n    {\r\n      \"normalY\": 1.0,\r\n      \"offset\": -2.0\r\n    },\r\n   
+    {\r\n      \"normalY\": -1.0,\r\n      \"offset\": -6.0\r\n    },\r\n    {\r\n     
+    \"normalZ\": 1.0,\r\n      \"offset\": -9.0\r\n    },\r\n    {\r\n      \"normalZ\":
+    -1.0,\r\n      \"offset\": -9.0\r\n    },\r\n    {\r\n      \"normalX\": 1.0,\r\n     
+    \"offset\": -64.0\r\n    },\r\n    {\r\n      \"normalY\": 1.0,\r\n      \"offset\":
+    -8.0\r\n    },\r\n    {\r\n      \"normalY\": -1.0\r\n    },\r\n    {\r\n     
+    \"normalZ\": 1.0,\r\n      \"offset\": -64.0\r\n    },\r\n    {\r\n      \"normalZ\":
+    -1.0,\r\n      \"offset\": -64.0\r\n    },\r\n    {\r\n      \"normalX\": -1.0,\r\n     
+    \"offset\": -64.0\r\n    }\r\n  ],\r\n  \"root\": {\r\n    \"nodeId\": 0,\r\n   
+    \"planeId\": 0,\r\n    \"negative\": {\r\n      \"nodeId\": 1,\r\n      \"planeId\":
+    6,\r\n      \"negative\": {\r\n        \"type\": \"Out\"\r\n      },\r\n     
+    \"positive\": {\r\n        \"nodeId\": 2,\r\n        \"planeId\": 7,\r\n       
+    \"negative\": {\r\n          \"type\": \"Out\"\r\n        },\r\n        \"positive\":
+    {\r\n          \"nodeId\": 3,\r\n          \"planeId\": 8,\r\n          \"negative\":
+    {\r\n            \"type\": \"Out\"\r\n          },\r\n          \"positive\":
+    {\r\n            \"nodeId\": 4,\r\n            \"planeId\": 9,\r\n           
+    \"negative\": {\r\n              \"type\": \"Out\"\r\n            },\r\n           
+    \"positive\": {\r\n              \"nodeId\": 5,\r\n              \"planeId\":
+    10,\r\n              \"negative\": {\r\n                \"type\": \"Out\"\r\n             
+    },\r\n              \"positive\": {\r\n                \"type\": \"In\"\r\n             
+    }\r\n            }\r\n          }\r\n        }\r\n      }\r\n    },\r\n    \"positive\":
+    {\r\n      \"nodeId\": 6,\r\n      \"planeId\": 1,\r\n      \"negative\": {\r\n       
+    \"nodeId\": 7,\r\n        \"planeId\": 11,\r\n        \"negative\": {\r\n         
+    \"type\": \"Out\"\r\n        },\r\n        \"positive\": {\r\n          \"nodeId\":
+    8,\r\n          \"planeId\": 7,\r\n          \"negative\": {\r\n            \"type\":
+    \"Out\"\r\n          },\r\n          \"positive\": {\r\n            \"nodeId\":
+    9,\r\n            \"planeId\": 8,\r\n            \"negative\": {\r\n             
+    \"type\": \"Out\"\r\n            },\r\n            \"positive\": {\r\n             
+    \"nodeId\": 10,\r\n              \"planeId\": 9,\r\n              \"negative\":
+    {\r\n                \"type\": \"Out\"\r\n              },\r\n              \"positive\":
+    {\r\n                \"nodeId\": 11,\r\n                \"planeId\": 10,\r\n               
+    \"negative\": {\r\n                  \"type\": \"Out\"\r\n                },\r\n               
+    \"positive\": {\r\n                  \"type\": \"In\"\r\n                }\r\n             
+    }\r\n            }\r\n          }\r\n        }\r\n      },\r\n      \"positive\":
+    {\r\n        \"nodeId\": 12,\r\n        \"planeId\": 2,\r\n        \"negative\":
+    {\r\n          \"nodeId\": 13,\r\n          \"planeId\": 7,\r\n          \"negative\":
+    {\r\n            \"type\": \"Out\"\r\n          },\r\n          \"positive\":
+    {\r\n            \"nodeId\": 14,\r\n            \"planeId\": 9,\r\n           
+    \"negative\": {\r\n              \"type\": \"Out\"\r\n            },\r\n           
+    \"positive\": {\r\n              \"nodeId\": 15,\r\n              \"planeId\":
+    10,\r\n              \"negative\": {\r\n                \"type\": \"Out\"\r\n             
+    },\r\n              \"positive\": {\r\n                \"type\": \"In\"\r\n             
+    }\r\n            }\r\n          }\r\n        },\r\n        \"positive\": {\r\n         
+    \"nodeId\": 16,\r\n          \"planeId\": 3,\r\n          \"negative\": {\r\n           
+    \"type\": \"Out\"\r\n          },\r\n          \"positive\": {\r\n           
+    \"nodeId\": 17,\r\n            \"planeId\": 4,\r\n            \"negative\": {\r\n             
+    \"nodeId\": 18,\r\n              \"planeId\": 8,\r\n              \"negative\":
+    {\r\n                \"type\": \"Out\"\r\n              },\r\n              \"positive\":
+    {\r\n                \"nodeId\": 19,\r\n                \"planeId\": 9,\r\n               
+    \"negative\": {\r\n                  \"type\": \"Out\"\r\n                },\r\n               
+    \"positive\": {\r\n                  \"type\": \"In\"\r\n                }\r\n             
+    }\r\n            },\r\n            \"positive\": {\r\n              \"nodeId\":
+    20,\r\n              \"planeId\": 5,\r\n              \"negative\": {\r\n               
+    \"nodeId\": 21,\r\n                \"planeId\": 8,\r\n                \"negative\":
+    {\r\n                  \"type\": \"Out\"\r\n                },\r\n               
+    \"positive\": {\r\n                  \"nodeId\": 22,\r\n                  \"planeId\":
+    10,\r\n                  \"negative\": {\r\n                    \"type\": \"Out\"\r\n                 
+    },\r\n                  \"positive\": {\r\n                    \"type\": \"In\"\r\n                 
+    }\r\n                }\r\n              },\r\n              \"positive\": {\r\n               
+    \"type\": \"In\"\r\n              }\r\n            }\r\n          }\r\n       
+    }\r\n      }\r\n    }\r\n  }\r\n}"
   debugNodes: 
   debugDraw: 0
 --- !u!33 &1698812945
@@ -578,7 +577,6 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 449291595}
-  - {fileID: 1424346741}
   - {fileID: 363557537}
   m_Father: {fileID: 0}
   m_RootOrder: 2

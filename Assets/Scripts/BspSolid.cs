@@ -14,6 +14,7 @@ namespace CsgTest
     {
         private BspPlane[] _planes;
         private BspNode[] _nodes;
+        private NodeIndex _rootIndex = NodeIndex.Out;
 
         private readonly Dictionary<BspPlane, ushort> _planeDict = new Dictionary<BspPlane, ushort>();
 
@@ -69,6 +70,7 @@ namespace CsgTest
         {
             _nodeCount = 0;
             _planeCount = 0;
+            _rootIndex = NodeIndex.Out;
 
             _planeDict.Clear();
         }
@@ -100,18 +102,13 @@ namespace CsgTest
             return (index, false);
         }
 
-        private ushort AddNode(ushort planeIndex, ushort negativeIndex, ushort positiveIndex)
+        private NodeIndex AddNode(ushort planeIndex, NodeIndex negativeIndex, NodeIndex positiveIndex)
         {
-            if (_nodeCount >= ushort.MaxValue - 1)
-            {
-                throw new Exception("Too many nodes!");
-            }
-
             Helpers.EnsureCapacity(ref _nodes, _nodeCount + 1);
 
             _nodes[_nodeCount] = new BspNode(planeIndex, negativeIndex, positiveIndex);
 
-            return (ushort)_nodeCount++;
+            return _nodeCount++;
         }
 
         public void Transform(float4x4 matrix)

@@ -16,13 +16,13 @@ namespace CsgTest
         /// </summary>
         public void Reduce()
         {
-            if (_nodeCount == 0) return;
+            if (_rootIndex.IsLeaf) return;
 
             var nodeRemapDict = _sNodeRemapDict ?? (_sNodeRemapDict = new Dictionary<ushort, ushort>());
 
             nodeRemapDict.Clear();
 
-            var changed = DiscoverNodes(0, nodeRemapDict);
+            var changed = DiscoverNodes(_rootIndex, nodeRemapDict);
 
             if (!changed)
             {
@@ -71,6 +71,8 @@ namespace CsgTest
                 oldNodes.Dispose();
             }
 
+            _rootIndex = nodeRemapDict[_rootIndex.Value];
+
             _planeCount = _planeDict.Count;
 
             foreach (var pair in _planeDict)
@@ -79,23 +81,18 @@ namespace CsgTest
             }
         }
 
-        private bool DiscoverNodes(ushort nodeIndex, Dictionary<ushort, ushort> nodeRemapDict)
+        private bool DiscoverNodes(NodeIndex nodeIndex, Dictionary<ushort, ushort> nodeRemapDict)
         {
-            var changed = nodeIndex != nodeRemapDict.Count;
+            if (nodeIndex.IsLeaf) return false;
 
-            nodeRemapDict.Add(nodeIndex, (ushort) nodeRemapDict.Count);
+            var changed = nodeIndex.Value != nodeRemapDict.Count;
+
+            nodeRemapDict.Add(nodeIndex.Value, (ushort) nodeRemapDict.Count);
 
             var node = _nodes[nodeIndex];
 
-            if (!BspNode.IsLeafIndex(node.NegativeIndex))
-            {
-                changed |= DiscoverNodes(node.NegativeIndex, nodeRemapDict);
-            }
-
-            if (!BspNode.IsLeafIndex(node.PositiveIndex))
-            {
-                changed |= DiscoverNodes(node.PositiveIndex, nodeRemapDict);
-            }
+            changed |= DiscoverNodes(node.NegativeIndex, nodeRemapDict);
+            changed |= DiscoverNodes(node.PositiveIndex, nodeRemapDict);
 
             return changed;
         }
