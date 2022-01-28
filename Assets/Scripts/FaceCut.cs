@@ -30,12 +30,12 @@ namespace CsgTest
 
         public FaceCut(float2 normal, float distance, float min, float max) => (Normal, Angle, Distance, Min, Max) = (normal, math.atan2(normal.y, normal.x), distance, min, max);
         
-        public float3 GetPoint(float3 origin, float3 tu, float3 tv)
+        public float3 GetPoint(in (float3 origin, float3 tu, float3 tv) basis)
         {
             var minFinite = !float.IsNegativeInfinity(Min);
             var maxFinite = !float.IsPositiveInfinity(Max);
 
-            return GetPoint(origin, tu, tv, minFinite && maxFinite
+            return GetPoint(basis, minFinite && maxFinite
                 ? (Min + Max) * 0.5f
                 : minFinite
                     ? Min + 1f
@@ -44,11 +44,13 @@ namespace CsgTest
                         : 0f);
         }
 
-        public float3 GetPoint(float3 origin, float3 tu, float3 tv, float along)
+        public float3 GetPoint(in (float3 origin, float3 tu, float3 tv) basis, float along)
         {
-            var pos = Normal * Distance + new float2(-Normal.y, Normal.x) * along;
+            var pos = Normal * Distance + new float2(-Normal.y, Normal.x) * math.clamp(along,
+                float.IsNegativeInfinity(Min) ? -1024f : Min,
+                float.IsPositiveInfinity(Max) ? 1024f : Max);
 
-            return origin + tu * pos.x + tv * pos.y;
+            return basis.origin + basis.tu * pos.x + basis.tv * pos.y;
         }
 
         public int CompareTo(FaceCut other)
@@ -77,6 +79,44 @@ namespace CsgTest
             {
                 return (Normal.GetHashCode() * 397) ^ Distance.GetHashCode();
             }
+        }
+
+        public FaceCut Transform(in float4x4 matrix, in float4x4 normalMatrix,
+            (float3 origin, float3 tu, float3 tv) oldBasis,
+            (float3 origin, float3 tu, float3 tv) newBasis)
+        {
+            var normal3 = Normal.x * oldBasis.tu + Normal.y * oldBasis.tv;
+            var pos = oldBasis.origin + normal3 * Distance;
+
+            normal3 = math.normalizesafe(math.mul(normalMatrix, new float4(normal3, 0f)).xyz);
+            pos = math.transform(matrix, pos);
+
+            var newNormal = math.normalizesafe(new float2(
+                math.dot(newBasis.tu, normal3),
+                math.dot(newBasis.tv, normal3)));
+
+            var min = Min;
+            var max = Max;
+
+            var tangent = new float2(-Normal.y, Normal.x);
+
+            if (!float.IsNegativeInfinity(min))
+            {
+                var minPos3 = math.transform(matrix, GetPoint(oldBasis, min));
+                var minPos = new float2(math.dot(newBasis.tu, minPos3),
+                    math.dot(newBasis.tv, minPos3));
+                min = math.dot(minPos, tangent);
+            }
+
+            if (!float.IsNegativeInfinity(max))
+            {
+                var maxPos3 = math.transform(matrix, GetPoint(oldBasis, max));
+                var maxPos = new float2(math.dot(newBasis.tu, maxPos3),
+                    math.dot(newBasis.tv, maxPos3));
+                max = math.dot(maxPos, tangent);
+            }
+
+            return new FaceCut(newNormal, math.dot(normal3, pos - newBasis.origin), min, max);
         }
     }
 

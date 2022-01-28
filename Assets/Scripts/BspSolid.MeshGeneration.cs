@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
@@ -43,8 +44,20 @@ namespace CsgTest
             private int _vertexCount;
             private int _triangleCount;
 
+            public bool StatsOnly { get; set; }
+
             private bool _enableIndexFilter;
             private readonly HashSet<int> _indexFilter = new HashSet<int>();
+
+            public void Reset()
+            {
+                Clear();
+
+                StatsOnly = false;
+
+                _enableIndexFilter = false;
+                _indexFilter.Clear();
+            }
 
             public void Clear()
             {
@@ -52,9 +65,6 @@ namespace CsgTest
 
                 _vertexCount = 0;
                 _triangleCount = 0;
-
-                _enableIndexFilter = false;
-                _indexFilter.Clear();
             }
 
             public void FilterNodes(IEnumerable<int> indices)
@@ -67,7 +77,7 @@ namespace CsgTest
                 }
             }
 
-            private void Init(BspSolid solid)
+            public void Init(BspSolid solid)
             {
                 _nodes = solid._nodes;
                 _planes = solid._planes;
@@ -186,10 +196,10 @@ namespace CsgTest
                     }
 
 #if UNITY_EDITOR
-                    avg /= face.VertexCount;
+                    //avg /= face.VertexCount;
 
-                    UnityEditor.Handles.color = Gizmos.color;
-                    UnityEditor.Handles.Label(avg, $"face {index}");
+                    //UnityEditor.Handles.color = Gizmos.color;
+                    //UnityEditor.Handles.Label(avg, $"face {index}");
 #endif
 
                     ++index;
@@ -226,16 +236,16 @@ namespace CsgTest
                 return stats;
             }
 
-            private TriangulationStats TriangulateFace(Stack<BspPlane> planes, BspNode node)
+            public TriangulationStats TriangulateFace(Stack<BspPlane> planes, BspNode node)
             {
                 var plane = _planes[node.PlaneIndex];
-                var (origin, tu, tv) = plane.GetBasis();
+                var basis = plane.GetBasis();
 
                 _nodeCuts.Clear();
 
                 foreach (var cutPlane in planes)
                 {
-                    var faceCut = Helpers.GetFaceCut(plane, cutPlane, origin, tu, tv);
+                    var faceCut = Helpers.GetFaceCut(plane, cutPlane, basis);
                     var (excludesNone, excludesAll) = _nodeCuts.GetNewFaceCutExclusions(faceCut);
 
                     if (excludesAll) return default;
@@ -262,16 +272,16 @@ namespace CsgTest
                     _faceCuts.AddRange(_nodeCuts);
 
                     var pathIndex = 0;
-                    var negativeLeaf = HandleChildCuts(plane, origin, tu, tv, node.NegativeIndex, path,
+                    var negativeLeaf = HandleChildCuts(plane, basis, node.NegativeIndex, path,
                         ref pathIndex);
-                    var positiveLeaf = HandleChildCuts(plane, origin, tu, tv, node.PositiveIndex, path,
+                    var positiveLeaf = HandleChildCuts(plane, basis, node.PositiveIndex, path,
                         ref pathIndex);
 
                     if (!negativeLeaf.IsLeaf || !positiveLeaf.IsLeaf)
                     {
                         continue;
                     }
-                    
+
                     stats.NegativeOut |= negativeLeaf.IsOut;
                     stats.NegativeIn |= negativeLeaf.IsIn;
 
@@ -280,48 +290,44 @@ namespace CsgTest
 
                     if (!_enableIndexFilter && negativeLeaf == positiveLeaf) continue;
 
-                    for (var i = _faceCuts.Count - 1; i >= 0; --i)
-                    {
-                        var cut = _faceCuts[i];
-
-                        if (float.IsNegativeInfinity(cut.Min) || float.IsPositiveInfinity(cut.Max))
-                        {
-                            _faceCuts.Clear();
-                            break;
-                        }
-
-                        if (cut.Max <= cut.Min)
-                        {
-                            _faceCuts.RemoveAt(i);
-                        }
-                    }
+                    _faceCuts.RemoveAll(x => x.Max <= x.Min + Epsilon);
 
                     if (_faceCuts.Count < 3) continue;
 
-                    stats.VertexCount += _faceCuts.Count;
+                    var vertexCount = (ushort)(_faceCuts.Count + _faceCuts.Count(x => float.IsNegativeInfinity(x.Min)));
+
+                    stats.FaceCount += 1;
+                    stats.VertexCount += vertexCount;
+
+                    _triangleCount += vertexCount - 2;
+
+                    if (StatsOnly) continue;
 
                     _faceCuts.Sort(FaceCut.Comparer);
 
                     var firstVertex = (ushort) _vertexCount;
-                    var vertexCount = (ushort) _faceCuts.Count;
                     var flipped = positiveLeaf.IsIn;
                     var normal = plane.Normal * (positiveLeaf.IsIn ? -1f : 1f);
 
                     _faces.Add(new Face(firstVertex, vertexCount, flipped, normal));
-                    _triangleCount += vertexCount - 2;
 
                     Helpers.EnsureCapacity(ref _vertices, _vertexCount + _faceCuts.Count);
 
                     foreach (var cut in _faceCuts)
                     {
-                        _vertices[_vertexCount++] = cut.GetPoint(origin, tu, tv, cut.Max);
+                        _vertices[_vertexCount++] = cut.GetPoint(basis, cut.Max);
+
+                        if (float.IsNegativeInfinity(cut.Min))
+                        {
+                            _vertices[_vertexCount++] = cut.GetPoint(basis, cut.Min);
+                        }
                     }
                 }
 
                 return stats;
             }
 
-            private NodeIndex HandleChildCuts(BspPlane plane, float3 origin, float3 tu, float3 tv, NodeIndex index, uint path, ref int pathIndex)
+            private NodeIndex HandleChildCuts(BspPlane plane, in (float3 origin, float3 tu, float3 tv) basis, NodeIndex index, uint path, ref int pathIndex)
             {
                 while (true)
                 {
@@ -334,7 +340,7 @@ namespace CsgTest
 
                     var child = _nodes[index];
                     var childPlane = _planes[child.PlaneIndex];
-                    var positiveCut = Helpers.GetFaceCut(plane, childPlane, origin, tu, tv);
+                    var positiveCut = Helpers.GetFaceCut(plane, childPlane, basis);
                     var negativeCut = -positiveCut;
 
                     var (negExcludesAll, posExcludesAll) = _faceCuts.GetNewFaceCutExclusions(positiveCut);
@@ -368,34 +374,36 @@ namespace CsgTest
                     index = positive ? child.PositiveIndex : child.NegativeIndex;
                 }
             }
+        }
 
-            private struct TriangulationStats
+        public struct TriangulationStats
+        {
+            public static TriangulationStats operator +(TriangulationStats a, TriangulationStats b)
             {
-                public static TriangulationStats operator +(TriangulationStats a, TriangulationStats b)
+                return new TriangulationStats
                 {
-                    return new TriangulationStats
-                    {
-                        VertexCount = a.VertexCount + b.VertexCount,
+                    FaceCount = a.FaceCount + b.FaceCount,
+                    VertexCount = a.VertexCount + b.VertexCount,
 
-                        NegativeOut = a.NegativeOut | b.NegativeOut,
-                        NegativeIn = a.NegativeIn | b.NegativeIn,
-                        PositiveOut = a.PositiveOut | b.PositiveOut,
-                        PositiveIn = a.PositiveIn | b.PositiveIn
-                    };
-                }
+                    NegativeOut = a.NegativeOut | b.NegativeOut,
+                    NegativeIn = a.NegativeIn | b.NegativeIn,
+                    PositiveOut = a.PositiveOut | b.PositiveOut,
+                    PositiveIn = a.PositiveIn | b.PositiveIn
+                };
+            }
 
-                public int VertexCount;
+            public int FaceCount;
+            public int VertexCount;
 
-                public bool NegativeOut;
-                public bool NegativeIn;
-                public bool PositiveOut;
-                public bool PositiveIn;
+            public bool NegativeOut;
+            public bool NegativeIn;
+            public bool PositiveOut;
+            public bool PositiveIn;
 
-                public override string ToString()
-                {
-                    return
-                        $"{{ VertexCount: {VertexCount}, NegativeOut: {NegativeOut}, NegativeIn: {NegativeIn}, PositiveOut: {PositiveOut}, PositiveIn: {PositiveIn} }}";
-                }
+            public override string ToString()
+            {
+                return
+                    $"{{ FaceCount: {FaceCount}, VertexCount: {VertexCount}, NegativeOut: {NegativeOut}, NegativeIn: {NegativeIn}, PositiveOut: {PositiveOut}, PositiveIn: {PositiveIn} }}";
             }
         }
 
@@ -406,7 +414,7 @@ namespace CsgTest
         {
             if (_sMeshGenerator == null) _sMeshGenerator = new MeshGenerator();
 
-            _sMeshGenerator.Clear();
+            _sMeshGenerator.Reset();
 
             return _sMeshGenerator;
         }

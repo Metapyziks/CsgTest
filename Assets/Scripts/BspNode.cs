@@ -88,30 +88,44 @@ namespace CsgTest
         public readonly ushort PlaneIndex;
         public readonly NodeIndex NegativeIndex;
         public readonly NodeIndex PositiveIndex;
+        public readonly ushort ChildCount;
 
-        public BspNode(ushort planeIndex, NodeIndex negativeIndex, NodeIndex positiveIndex) =>
-            (PlaneIndex, NegativeIndex, PositiveIndex) = (planeIndex, negativeIndex, positiveIndex);
+        public BspNode(ushort planeIndex, NodeIndex negativeIndex, NodeIndex positiveIndex, ushort childCount) =>
+            (PlaneIndex, NegativeIndex, PositiveIndex, ChildCount) = (planeIndex, negativeIndex, positiveIndex, childCount);
 
         public BspNode WithNegativeIndex(NodeIndex value)
         {
-            return new BspNode(PlaneIndex, value, PositiveIndex);
+            return new BspNode(PlaneIndex, value, PositiveIndex, ChildCount);
         }
 
         public BspNode WithPositiveIndex(NodeIndex value)
         {
-            return new BspNode(PlaneIndex, NegativeIndex, value);
+            return new BspNode(PlaneIndex, NegativeIndex, value, ChildCount);
         }
 
         public BspNode WithPlaneIndex(ushort value)
         {
-            return new BspNode(value, NegativeIndex, PositiveIndex);
+            return new BspNode(value, NegativeIndex, PositiveIndex, ChildCount);
+        }
+
+        public BspNode WithPlaneIndex((ushort Value, bool Flipped) tuple)
+        {
+            return new BspNode(tuple.Value,
+                tuple.Flipped ? PositiveIndex : NegativeIndex,
+                tuple.Flipped ? NegativeIndex : PositiveIndex, ChildCount);
         }
 
         public BspNode Remapped(Dictionary<ushort, ushort> nodeRemapDict)
         {
             return new BspNode(PlaneIndex,
                 NegativeIndex.IsLeaf ? NegativeIndex : nodeRemapDict[NegativeIndex.Value],
-                PositiveIndex.IsLeaf ? PositiveIndex : nodeRemapDict[PositiveIndex.Value]);
+                PositiveIndex.IsLeaf ? PositiveIndex : nodeRemapDict[PositiveIndex.Value],
+                ChildCount);
+        }
+
+        public BspNode WithChildCount(int value)
+        {
+            return new BspNode(PlaneIndex, NegativeIndex, PositiveIndex, (ushort) value);
         }
 
         public override string ToString()

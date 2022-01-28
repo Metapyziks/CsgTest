@@ -22,7 +22,7 @@ namespace CsgTest
 
             nodeRemapDict.Clear();
 
-            var changed = DiscoverNodes(_rootIndex, nodeRemapDict);
+            var (changed, count) = DiscoverNodes(_rootIndex, nodeRemapDict);
 
             if (!changed)
             {
@@ -64,6 +64,8 @@ namespace CsgTest
                     _nodes[newIndex] = oldNode.Remapped(nodeRemapDict);
                 }
 
+                Array.Clear(_nodes, nodeRemapDict.Count, _nodeCount - nodeRemapDict.Count);
+
                 _nodeCount = nodeRemapDict.Count;
             }
             finally
@@ -71,8 +73,9 @@ namespace CsgTest
                 oldNodes.Dispose();
             }
 
-            _rootIndex = nodeRemapDict[_rootIndex.Value];
+            Array.Clear(_planes, _planeDict.Count, _planeCount - _planeDict.Count);
 
+            _rootIndex = nodeRemapDict[_rootIndex.Value];
             _planeCount = _planeDict.Count;
 
             foreach (var pair in _planeDict)
@@ -81,20 +84,22 @@ namespace CsgTest
             }
         }
 
-        private bool DiscoverNodes(NodeIndex nodeIndex, Dictionary<ushort, ushort> nodeRemapDict)
+        private (bool Changed, int Count) DiscoverNodes(NodeIndex nodeIndex, Dictionary<ushort, ushort> nodeRemapDict)
         {
-            if (nodeIndex.IsLeaf) return false;
+            if (nodeIndex.IsLeaf) return (false, 0);
 
             var changed = nodeIndex.Value != nodeRemapDict.Count;
 
             nodeRemapDict.Add(nodeIndex.Value, (ushort) nodeRemapDict.Count);
 
-            var node = _nodes[nodeIndex];
+            ref var node = ref _nodes[nodeIndex];
 
-            changed |= DiscoverNodes(node.NegativeIndex, nodeRemapDict);
-            changed |= DiscoverNodes(node.PositiveIndex, nodeRemapDict);
+            var lhs = DiscoverNodes(node.NegativeIndex, nodeRemapDict);
+            var rhs = DiscoverNodes(node.PositiveIndex, nodeRemapDict);
 
-            return changed;
+            node = node.WithChildCount(lhs.Count + rhs.Count);
+
+            return (changed | lhs.Changed | rhs.Changed, 1 + lhs.Count + rhs.Count);
         }
     }
 }

@@ -106,7 +106,18 @@ namespace CsgTest
         {
             Helpers.EnsureCapacity(ref _nodes, _nodeCount + 1);
 
-            _nodes[_nodeCount] = new BspNode(planeIndex, negativeIndex, positiveIndex);
+            _nodes[_nodeCount] = new BspNode(planeIndex, negativeIndex, positiveIndex, 0);
+
+            return _nodeCount++;
+        }
+
+        private NodeIndex AddNode((ushort Index, bool Flipped) plane, NodeIndex negativeIndex, NodeIndex positiveIndex)
+        {
+            Helpers.EnsureCapacity(ref _nodes, _nodeCount + 1);
+
+            _nodes[_nodeCount] = new BspNode(plane.Index,
+                plane.Flipped ? positiveIndex : negativeIndex,
+                plane.Flipped ? negativeIndex : positiveIndex, 0);
 
             return _nodeCount++;
         }

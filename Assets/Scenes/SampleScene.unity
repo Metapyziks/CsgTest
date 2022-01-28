@@ -123,96 +123,6 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &363557536
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 363557537}
-  - component: {fileID: 363557538}
-  m_Layer: 0
-  m_Name: Floor
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &363557537
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 363557536}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -4, z: 0}
-  m_LocalScale: {x: 128, y: 8, z: 128}
-  m_Children: []
-  m_Father: {fileID: 1698812946}
-  m_RootOrder: 1
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &363557538
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 363557536}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7ddd2cb5e83ee7545bf4c04b89caa879, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  Operator: 0
-  Primitive: 0
---- !u!1 &449291594
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 449291595}
-  - component: {fileID: 449291596}
-  m_Layer: 0
-  m_Name: Outside
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &449291595
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 449291594}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 2, z: 0}
-  m_LocalScale: {x: 18, y: 8, z: 18}
-  m_Children: []
-  m_Father: {fileID: 1698812946}
-  m_RootOrder: 0
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &449291596
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 449291594}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7ddd2cb5e83ee7545bf4c04b89caa879, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  Operator: 0
-  Primitive: 0
 --- !u!1 &492896516
 GameObject:
   m_ObjectHideFlags: 0
@@ -304,7 +214,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 3
+  m_RootOrder: 2
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &705507993
 GameObject:
@@ -399,6 +309,51 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 1
   m_LocalEulerAnglesHint: {x: 50, y: -30, z: 0}
+--- !u!1 &938417741
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 938417742}
+  - component: {fileID: 938417743}
+  m_Layer: 0
+  m_Name: A
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &938417742
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 938417741}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 8, y: 2, z: 8}
+  m_Children: []
+  m_Father: {fileID: 1313502518}
+  m_RootOrder: 0
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &938417743
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 938417741}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7ddd2cb5e83ee7545bf4c04b89caa879, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  Operator: 0
+  Primitive: 0
 --- !u!1001 &1130165298
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -460,7 +415,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 1162f20cf9a412c4fb8575b2950fa3df, type: 3}
---- !u!1 &1698812943
+--- !u!1 &1313502515
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -468,171 +423,97 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1698812946}
-  - component: {fileID: 1698812945}
-  - component: {fileID: 1698812944}
-  - component: {fileID: 1698812947}
-  - component: {fileID: 1698812949}
+  - component: {fileID: 1313502518}
+  - component: {fileID: 1313502517}
+  - component: {fileID: 1313502516}
   m_Layer: 0
-  m_Name: GameObject
+  m_Name: Polyhedra
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1698812944
+--- !u!114 &1313502516
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1698812943}
+  m_GameObject: {fileID: 1313502515}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 044ec0bdc348d654dbfa6ae290ce0cb7, type: 3}
+  m_Script: {fileID: 11500000, guid: 6c95941bfa918444eb4fa057a1c96b1e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  value: "{\r\n  \"planes\": [\r\n    {\r\n      \"normalX\": 1.0,\r\n      \"offset\":
-    -9.0\r\n    },\r\n    {\r\n      \"normalX\": -1.0,\r\n      \"offset\": -9.0\r\n   
-    },\r\n    {\r\n      \"normalY\": 1.0,\r\n      \"offset\": -2.0\r\n    },\r\n   
-    {\r\n      \"normalY\": -1.0,\r\n      \"offset\": -6.0\r\n    },\r\n    {\r\n     
-    \"normalZ\": 1.0,\r\n      \"offset\": -9.0\r\n    },\r\n    {\r\n      \"normalZ\":
-    -1.0,\r\n      \"offset\": -9.0\r\n    },\r\n    {\r\n      \"normalX\": 1.0,\r\n     
-    \"offset\": -64.0\r\n    },\r\n    {\r\n      \"normalY\": 1.0,\r\n      \"offset\":
-    -8.0\r\n    },\r\n    {\r\n      \"normalY\": -1.0\r\n    },\r\n    {\r\n     
-    \"normalZ\": 1.0,\r\n      \"offset\": -64.0\r\n    },\r\n    {\r\n      \"normalZ\":
-    -1.0,\r\n      \"offset\": -64.0\r\n    },\r\n    {\r\n      \"normalX\": -1.0,\r\n     
-    \"offset\": -64.0\r\n    }\r\n  ],\r\n  \"root\": {\r\n    \"nodeId\": 0,\r\n   
-    \"planeId\": 0,\r\n    \"negative\": {\r\n      \"nodeId\": 1,\r\n      \"planeId\":
-    6,\r\n      \"negative\": {\r\n        \"type\": \"Out\"\r\n      },\r\n     
-    \"positive\": {\r\n        \"nodeId\": 2,\r\n        \"planeId\": 7,\r\n       
-    \"negative\": {\r\n          \"type\": \"Out\"\r\n        },\r\n        \"positive\":
-    {\r\n          \"nodeId\": 3,\r\n          \"planeId\": 8,\r\n          \"negative\":
-    {\r\n            \"type\": \"Out\"\r\n          },\r\n          \"positive\":
-    {\r\n            \"nodeId\": 4,\r\n            \"planeId\": 9,\r\n           
-    \"negative\": {\r\n              \"type\": \"Out\"\r\n            },\r\n           
-    \"positive\": {\r\n              \"nodeId\": 5,\r\n              \"planeId\":
-    10,\r\n              \"negative\": {\r\n                \"type\": \"Out\"\r\n             
-    },\r\n              \"positive\": {\r\n                \"type\": \"In\"\r\n             
-    }\r\n            }\r\n          }\r\n        }\r\n      }\r\n    },\r\n    \"positive\":
-    {\r\n      \"nodeId\": 6,\r\n      \"planeId\": 1,\r\n      \"negative\": {\r\n       
-    \"nodeId\": 7,\r\n        \"planeId\": 11,\r\n        \"negative\": {\r\n         
-    \"type\": \"Out\"\r\n        },\r\n        \"positive\": {\r\n          \"nodeId\":
-    8,\r\n          \"planeId\": 7,\r\n          \"negative\": {\r\n            \"type\":
-    \"Out\"\r\n          },\r\n          \"positive\": {\r\n            \"nodeId\":
-    9,\r\n            \"planeId\": 8,\r\n            \"negative\": {\r\n             
-    \"type\": \"Out\"\r\n            },\r\n            \"positive\": {\r\n             
-    \"nodeId\": 10,\r\n              \"planeId\": 9,\r\n              \"negative\":
-    {\r\n                \"type\": \"Out\"\r\n              },\r\n              \"positive\":
-    {\r\n                \"nodeId\": 11,\r\n                \"planeId\": 10,\r\n               
-    \"negative\": {\r\n                  \"type\": \"Out\"\r\n                },\r\n               
-    \"positive\": {\r\n                  \"type\": \"In\"\r\n                }\r\n             
-    }\r\n            }\r\n          }\r\n        }\r\n      },\r\n      \"positive\":
-    {\r\n        \"nodeId\": 12,\r\n        \"planeId\": 2,\r\n        \"negative\":
-    {\r\n          \"nodeId\": 13,\r\n          \"planeId\": 7,\r\n          \"negative\":
-    {\r\n            \"type\": \"Out\"\r\n          },\r\n          \"positive\":
-    {\r\n            \"nodeId\": 14,\r\n            \"planeId\": 9,\r\n           
-    \"negative\": {\r\n              \"type\": \"Out\"\r\n            },\r\n           
-    \"positive\": {\r\n              \"nodeId\": 15,\r\n              \"planeId\":
-    10,\r\n              \"negative\": {\r\n                \"type\": \"Out\"\r\n             
-    },\r\n              \"positive\": {\r\n                \"type\": \"In\"\r\n             
-    }\r\n            }\r\n          }\r\n        },\r\n        \"positive\": {\r\n         
-    \"nodeId\": 16,\r\n          \"planeId\": 3,\r\n          \"negative\": {\r\n           
-    \"type\": \"Out\"\r\n          },\r\n          \"positive\": {\r\n           
-    \"nodeId\": 17,\r\n            \"planeId\": 4,\r\n            \"negative\": {\r\n             
-    \"nodeId\": 18,\r\n              \"planeId\": 8,\r\n              \"negative\":
-    {\r\n                \"type\": \"Out\"\r\n              },\r\n              \"positive\":
-    {\r\n                \"nodeId\": 19,\r\n                \"planeId\": 9,\r\n               
-    \"negative\": {\r\n                  \"type\": \"Out\"\r\n                },\r\n               
-    \"positive\": {\r\n                  \"type\": \"In\"\r\n                }\r\n             
-    }\r\n            },\r\n            \"positive\": {\r\n              \"nodeId\":
-    20,\r\n              \"planeId\": 5,\r\n              \"negative\": {\r\n               
-    \"nodeId\": 21,\r\n                \"planeId\": 8,\r\n                \"negative\":
-    {\r\n                  \"type\": \"Out\"\r\n                },\r\n               
-    \"positive\": {\r\n                  \"nodeId\": 22,\r\n                  \"planeId\":
-    10,\r\n                  \"negative\": {\r\n                    \"type\": \"Out\"\r\n                 
-    },\r\n                  \"positive\": {\r\n                    \"type\": \"In\"\r\n                 
-    }\r\n                }\r\n              },\r\n              \"positive\": {\r\n               
-    \"type\": \"In\"\r\n              }\r\n            }\r\n          }\r\n       
-    }\r\n      }\r\n    }\r\n  }\r\n}"
-  debugNodes: 
-  debugDraw: 0
---- !u!33 &1698812945
+  bounds:
+    m_Center: {x: 0, y: 0, z: 0}
+    m_Extent: {x: 8, y: 4, z: 8}
+--- !u!33 &1313502517
 MeshFilter:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1698812943}
+  m_GameObject: {fileID: 1313502515}
   m_Mesh: {fileID: 0}
---- !u!4 &1698812946
+--- !u!4 &1313502518
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1698812943}
+  m_GameObject: {fileID: 1313502515}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
-  - {fileID: 449291595}
-  - {fileID: 363557537}
+  - {fileID: 938417742}
+  - {fileID: 1856796694}
   m_Father: {fileID: 0}
-  m_RootOrder: 2
+  m_RootOrder: 3
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!23 &1698812947
-MeshRenderer:
+--- !u!1 &1856796693
+GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1698812943}
-  m_Enabled: 1
-  m_CastShadows: 1
-  m_ReceiveShadows: 1
-  m_DynamicOccludee: 1
-  m_MotionVectors: 1
-  m_LightProbeUsage: 1
-  m_ReflectionProbeUsage: 1
-  m_RayTracingMode: 2
-  m_RayTraceProcedural: 0
-  m_RenderingLayerMask: 1
-  m_RendererPriority: 0
-  m_Materials:
-  - {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
-  m_StaticBatchInfo:
-    firstSubMesh: 0
-    subMeshCount: 0
-  m_StaticBatchRoot: {fileID: 0}
-  m_ProbeAnchor: {fileID: 0}
-  m_LightProbeVolumeOverride: {fileID: 0}
-  m_ScaleInLightmap: 1
-  m_ReceiveGI: 1
-  m_PreserveUVs: 0
-  m_IgnoreNormalsForChartDetection: 0
-  m_ImportantGI: 0
-  m_StitchLightmapSeams: 1
-  m_SelectedEditorRenderState: 3
-  m_MinimumChartSize: 4
-  m_AutoUVMaxDistance: 0.5
-  m_AutoUVMaxAngle: 89
-  m_LightmapParameters: {fileID: 0}
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
-  m_SortingOrder: 0
-  m_AdditionalVertexStreams: {fileID: 0}
---- !u!64 &1698812949
-MeshCollider:
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1856796694}
+  - component: {fileID: 1856796695}
+  m_Layer: 0
+  m_Name: B
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1856796694
+Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1698812943}
-  m_Material: {fileID: 0}
-  m_IsTrigger: 0
+  m_GameObject: {fileID: 1856796693}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 3, z: 0}
+  m_LocalScale: {x: 4, y: 2, z: 4}
+  m_Children: []
+  m_Father: {fileID: 1313502518}
+  m_RootOrder: 1
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1856796695
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1856796693}
   m_Enabled: 1
-  serializedVersion: 4
-  m_Convex: 0
-  m_CookingOptions: 30
-  m_Mesh: {fileID: 0}
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7ddd2cb5e83ee7545bf4c04b89caa879, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  Operator: 1
+  Primitive: 0

@@ -39,7 +39,7 @@ namespace CsgTest
                 Array.Copy(oldArray, 0, array, 0, oldArray.Length);
             }
         }
-        
+
         public static (float3 origin, float3 tu, float3 tv) GetBasis(this BspPlane plane)
         {
             var tu = math.normalizesafe(plane.Normal.GetTangent());
@@ -50,8 +50,7 @@ namespace CsgTest
             return (origin, tu, tv);
         }
 
-
-        public static FaceCut GetFaceCut(BspPlane plane, BspPlane cutPlane, float3 origin, float3 tu, float3 tv)
+        public static FaceCut GetFaceCut(BspPlane plane, BspPlane cutPlane, in (float3 origin, float3 tu, float3 tv) basis)
         {
             var cutTangent = math.cross(plane.Normal, cutPlane.Normal);
 
@@ -69,12 +68,12 @@ namespace CsgTest
             cutNormal = math.normalizesafe(cutNormal);
 
             var cutNormal2 = new float2(
-                math.dot(cutNormal, tu),
-                math.dot(cutNormal, tv));
+                math.dot(cutNormal, basis.tu),
+                math.dot(cutNormal, basis.tv));
 
             cutNormal2 = math.normalizesafe(cutNormal2);
 
-            var t = math.dot(cutPlane.Normal * cutPlane.Offset - origin, cutPlane.Normal)
+            var t = math.dot(cutPlane.Normal * cutPlane.Offset - basis.origin, cutPlane.Normal)
                     / math.dot(cutPlane.Normal, cutNormal);
 
             return new FaceCut(cutNormal2, t, float.NegativeInfinity, float.PositiveInfinity);

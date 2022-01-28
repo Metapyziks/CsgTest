@@ -50,6 +50,7 @@ namespace CsgTest
 
             [JsonProperty("planeId")] public int? PlaneIndex { get; set; }
             [JsonProperty("type")] public JsonNodeType Type { get; set; }
+            [JsonProperty("childCount")] public int ChildCount { get; set; }
 
             [JsonProperty("negative")] public JsonNode Negative { get; set; }
             [JsonProperty("positive")] public JsonNode Positive { get; set; }
@@ -130,6 +131,7 @@ namespace CsgTest
                 NodeIndex = index,
                 PlaneIndex = node.PlaneIndex,
                 Type = JsonNodeType.Branch,
+                ChildCount = node.ChildCount,
 
                 Negative = ToJsonNode(node.NegativeIndex),
                 Positive = ToJsonNode(node.PositiveIndex)

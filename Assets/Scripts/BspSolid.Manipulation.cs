@@ -128,13 +128,13 @@ namespace CsgTest
                 }
             }
 
-            var lhs = new Solid(true, _nodes, _planes);
-            var rhs = new Solid(false, solid._nodes, planes);
+            var lhs = new Solid(_nodes, _planes);
+            var rhs = new Solid(solid._nodes, planes);
 
             var lhsRoot = _rootIndex;
             var rhsRoot = solid._rootIndex;
 
-            _rootIndex = Merge(leafPlanes, lhs, lhsRoot, rhs, rhsRoot, op);
+            _rootIndex = Merge(leafPlanes, lhs, lhsRoot, rhs, rhsRoot, op, false);
             Reduce();
         }
 
@@ -142,26 +142,24 @@ namespace CsgTest
 
         private readonly struct Solid
         {
-            public readonly bool IsDestination;
             public readonly BspNode[] Nodes;
             public readonly BspPlane[] Planes;
 
-            public Solid(bool isDestination, BspNode[] nodes, BspPlane[] planes)
+            public Solid(BspNode[] nodes, BspPlane[] planes)
             {
-                IsDestination = isDestination;
                 Nodes = nodes;
                 Planes = planes;
             }
         }
 
-        private NodeIndex Merge(Stack<BspPlane> leafPlanes, Solid lhs, NodeIndex lhsIndex, Solid rhs, NodeIndex rhsIndex, CsgOperator op)
+        private NodeIndex Merge(Stack<BspPlane> leafPlanes, Solid lhs, NodeIndex lhsIndex, Solid rhs, NodeIndex rhsIndex, CsgOperator op, bool hack)
         {
             if (lhsIndex.IsLeaf && rhsIndex.IsLeaf)
             {
                 return ApplyOperator(op, lhsIndex, rhsIndex);
             }
 
-            if (lhsIndex.IsLeaf)
+            if (lhsIndex.IsLeaf || !rhsIndex.IsLeaf && lhs.Nodes[lhsIndex].ChildCount < rhs.Nodes[rhsIndex].ChildCount)
             {
                 (lhs, rhs) = (rhs, lhs);
                 (lhsIndex, rhsIndex) = (rhsIndex, lhsIndex);
@@ -185,67 +183,83 @@ namespace CsgTest
 
             if (excludesNegative)
             {
-                return Merge(leafPlanes, lhs, lhsNode.PositiveIndex, rhs, rhsIndex, op);
+                return Merge(leafPlanes, lhs, lhsNode.PositiveIndex, rhs, rhsIndex, op, hack);
             }
 
             if (excludesPositive)
             {
-                return Merge(leafPlanes, lhs, lhsNode.NegativeIndex, rhs, rhsIndex, op);
+                return Merge(leafPlanes, lhs, lhsNode.NegativeIndex, rhs, rhsIndex, op, hack);
             }
-
-            var nodeIndex = lhsIndex;
             
-            if (!lhs.IsDestination)
-            {
-                var (planeIndex, flipped) = AddPlane(plane);
-
-                nodeIndex = AddNode(planeIndex, NodeIndex.Out, NodeIndex.Out);
-
-                lhsNode = lhsNode.WithPlaneIndex(planeIndex);
-
-                if (flipped)
-                {
-                    lhsNode = -lhsNode;
-                }
-            }
-
             leafPlanes.Push(-plane);
-            lhsNode = lhsNode.WithNegativeIndex(Merge(leafPlanes, lhs, lhsNode.NegativeIndex, rhs, rhsIndex, op));
+            lhsIndex = Merge(leafPlanes, lhs, lhsNode.NegativeIndex, rhs, rhsIndex, op, hack);
             leafPlanes.Pop();
 
             leafPlanes.Push(plane);
-            lhsNode = lhsNode.WithPositiveIndex(Merge(leafPlanes, lhs, lhsNode.PositiveIndex, rhs, rhsIndex, op));
+            rhsIndex = Merge(leafPlanes, lhs, lhsNode.PositiveIndex, rhs, rhsIndex, op, hack);
             leafPlanes.Pop();
 
-            if (lhsNode.NegativeIndex == lhsNode.PositiveIndex)
+            if (lhsIndex == rhsIndex)
             {
-                return lhsNode.NegativeIndex;
+                return lhsIndex;
             }
 
-            _nodes[nodeIndex] = lhsNode;
-            return nodeIndex;
+            var planeInfo = AddPlane(plane);
+
+            if (hack) return AddNode(planeInfo, lhsIndex, rhsIndex);
+
+            var mergedNode = new BspNode(0, lhsIndex, rhsIndex, 0)
+                .WithPlaneIndex(planeInfo);
+
+            var meshGen = GetMeshGenerator();
+
+            meshGen.Init(this);
+            meshGen.StatsOnly = true;
+
+            var stats = meshGen.TriangulateFace(leafPlanes, mergedNode);
+
+            if (stats.FaceCount == 0)
+            {
+                var lhsCut = AddNode(planeInfo, NodeIndex.In, NodeIndex.Out);
+                var rhsCut = AddNode(planeInfo, NodeIndex.Out, NodeIndex.In);
+
+                if (planeInfo.flipped)
+                {
+                    (lhsCut, rhsCut) = (rhsCut, lhsCut);
+                }
+
+                var solid = new Solid(_nodes, _planes);
+                lhsIndex = Merge(leafPlanes, solid, lhsIndex, solid, lhsCut, CsgOperator.And, false);
+                solid = new Solid(_nodes, _planes);
+                rhsIndex = Merge(leafPlanes, solid, rhsIndex, solid, rhsCut, CsgOperator.And, false);
+
+                solid = new Solid(_nodes, _planes);
+                return Merge(leafPlanes, solid, lhsIndex, solid, rhsIndex, CsgOperator.Or, true);
+            }
+
+            return AddNode(planeInfo, lhsIndex, rhsIndex);
         }
         
         [ThreadStatic]
         private static List<FaceCut> _sFaceCuts;
 
-        private float3 GetAnyPoint(List<FaceCut> cuts, float3 origin, float3 tu, float3 tv)
+        private float3 GetAnyPoint(List<FaceCut> cuts, in (float3 origin, float3 tu, float3 tv) basis)
         {
             if (cuts.Count == 0)
             {
-                return origin;
+                return basis.origin;
             }
 
             if (cuts.Count == 1)
             {
-                return cuts[0].GetPoint(origin, tu, tv);
+                return cuts[0].GetPoint(basis);
             }
 
             var point = float3.zero;
 
             foreach (var cut in cuts)
             {
-                point += cut.GetPoint(origin, tu, tv);
+                point += cut.GetPoint(basis);
             }
 
             return point / cuts.Count;
@@ -257,14 +271,14 @@ namespace CsgTest
 
             faceCuts.Clear();
 
-            var (origin, tu, tv) = plane.GetBasis();
+            var basis = plane.GetBasis();
 
             BspPlane excludingPlane = default;
             var excluded = false;
 
             foreach (var otherPlane in planes)
             {
-                var cut = Helpers.GetFaceCut(plane, otherPlane, origin, tu, tv);
+                var cut = Helpers.GetFaceCut(plane, otherPlane, basis);
 
                 if (cut.ExcludesAll)
                 {
@@ -293,7 +307,7 @@ namespace CsgTest
 
             faceCuts.Clear();
 
-            (origin, tu, tv) = excludingPlane.GetBasis();
+            basis = excludingPlane.GetBasis();
 
             foreach (var otherPlane in planes)
             {
@@ -302,7 +316,7 @@ namespace CsgTest
                     continue;
                 }
 
-                var cut = Helpers.GetFaceCut(excludingPlane, otherPlane, origin, tu, tv);
+                var cut = Helpers.GetFaceCut(excludingPlane, otherPlane, basis);
                 var (excludesNegative, excludesPositive) = faceCuts.GetNewFaceCutExclusions(cut);
 
                 if (excludesPositive || excludesNegative) continue;
@@ -310,7 +324,7 @@ namespace CsgTest
                 faceCuts.AddFaceCut(cut);
             }
 
-            var insidePoint = GetAnyPoint(faceCuts, origin, tu, tv);
+            var insidePoint = GetAnyPoint(faceCuts, basis);
 
             return math.dot(insidePoint, plane.Normal) > plane.Offset ? (true, false) : (false, true);
         }
