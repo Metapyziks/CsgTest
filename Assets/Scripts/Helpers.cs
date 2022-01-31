@@ -135,7 +135,7 @@ namespace CsgTest
 
                 var proj1 = (cut.Distance - other.Distance * dot) / -cross;
 
-                if (cross > 0f && proj1 < other.Max)
+                if (cross > 0f && proj1 < other.Max - BspSolid.Epsilon)
                 {
                     excludesAny = true;
 
@@ -144,7 +144,7 @@ namespace CsgTest
                         ++excludedCutCount;
                     }
                 }
-                else if (cross < 0f && proj1 > other.Min)
+                else if (cross < 0f && proj1 > other.Min + BspSolid.Epsilon)
                 {
                     excludesAny = true;
 

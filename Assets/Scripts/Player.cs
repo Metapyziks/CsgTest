@@ -112,17 +112,28 @@ namespace CsgTest
             var ray = new Ray(_eyes.position, _eyes.forward);
             if (!Raycast(ray, out var hitInfo, 16f)) return;
 
-            var bspDemo = hitInfo.transform.GetComponent<BspDemo>();
-            if (bspDemo == null) return;
-
             var position = hitInfo.point;
             var rotation = UnityEngine.Random.rotationUniform;
             var localScale = new Vector3(UnityEngine.Random.value * 0.125f + 1f,
                 UnityEngine.Random.value * 0.125f + 1f,
                 UnityEngine.Random.value * 0.125f + 1f) * SubtractSize;
+            
+            var bspDemo = hitInfo.transform.GetComponent<BspDemo>();
+            if (bspDemo != null)
+            {
+                bspDemo.Subtract(float4x4.TRS(position, rotation, localScale));
+                bspDemo.LogInfo();
+            }
 
-            bspDemo.Subtract(float4x4.TRS(position, rotation, localScale));
-            bspDemo.LogInfo();
+            var polyDemo = hitInfo.transform.GetComponent<PolyhedronDemo>();
+            if (polyDemo != null)
+            {
+                var mesh = ConvexPolyhedron.CreateDodecahedron(float3.zero, 0.5f);
+
+                mesh.Transform(float4x4.TRS(position, rotation, localScale));
+
+                polyDemo.Subtract(mesh);
+            }
         }
 
         void FixedUpdate()

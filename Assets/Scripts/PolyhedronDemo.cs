@@ -13,90 +13,177 @@ namespace CsgTest
     {
         private readonly List<ConvexPolyhedron> _polyhedra = new List<ConvexPolyhedron>();
 
-        public Bounds bounds;
-        
+        private bool _geometryInvalid;
+        private bool _meshInvalid;
+
+        private Vector3[] _vertices;
+        private Vector3[] _normals;
+        private ushort[] _indices;
+        private Mesh _mesh;
+
+        private int _nextIndex;
+
+        void Start()
+        {
+            _geometryInvalid = true;
+        }
+
         void Update()
         {
-            _polyhedra.Clear();
-
-            foreach (var brush in transform.GetComponentsInChildren<CsgBrush>())
+#if UNITY_EDITOR
+            if (!UnityEditor.EditorApplication.isPlaying)
             {
-                var shape = ConvexPolyhedron.CreateCube(new Bounds(Vector3.zero, Vector3.one));
-                var matrix = brush.transform.localToWorldMatrix;
-                var normalMatrix = math.transpose(math.inverse(matrix));
+                _geometryInvalid = true;
+            }
+#endif
 
-                shape.Transform(matrix, normalMatrix);
+            if (_geometryInvalid)
+            {
+                _geometryInvalid = false;
 
-                switch (brush.Operator)
+                _nextIndex = 0;
+                _polyhedra.Clear();
+
+                foreach (var brush in transform.GetComponentsInChildren<CsgBrush>())
                 {
-                    case BrushOperator.Add:
-                        Add(shape);
-                        break;
+                    var shape = brush.Primitive == Primitive.Cube
+                        ? ConvexPolyhedron.CreateCube(new Bounds(Vector3.zero, Vector3.one))
+                        : ConvexPolyhedron.CreateDodecahedron(Vector3.zero, 0.5f);
+                    var matrix = brush.transform.localToWorldMatrix;
+                    var normalMatrix = math.transpose(math.inverse(matrix));
 
-                    case BrushOperator.Subtract:
-                        Subtract(shape);
-                        break;
+                    shape.Name = $"{brush.name} {_nextIndex++}";
+
+                    shape.Transform(matrix, normalMatrix);
+
+                    switch (brush.Operator)
+                    {
+                        case BrushOperator.Add:
+                            Add(shape);
+                            break;
+
+                        case BrushOperator.Subtract:
+                            Subtract(shape);
+                            break;
+                    }
+                }
+            }
+
+            if (_meshInvalid)
+            {
+                _meshInvalid = false;
+
+                if (_mesh == null)
+                {
+                    var meshFilter = GetComponent<MeshFilter>();
+
+                    meshFilter.sharedMesh = _mesh = new Mesh
+                    {
+                        hideFlags = HideFlags.DontSave
+                    };
+
+                    _mesh.MarkDynamic();
+                }
+
+                var indexOffset = 0;
+                var vertexOffset = 0;
+
+                foreach (var poly in _polyhedra)
+                {
+                    var (faceCount, vertexCount) = poly.GetMeshInfo();
+
+                    Helpers.EnsureCapacity(ref _vertices, vertexOffset + vertexCount);
+                    Helpers.EnsureCapacity(ref _normals, vertexOffset + vertexCount);
+                    Helpers.EnsureCapacity(ref _indices, indexOffset + faceCount * 3);
+
+                    poly.WriteMesh(ref vertexOffset, ref indexOffset, _vertices, _normals, _indices);
+                }
+
+                _mesh.Clear();
+                _mesh.SetVertices(_vertices, 0, vertexOffset);
+                _mesh.SetNormals(_normals, 0, vertexOffset);
+                _mesh.SetIndices(_indices, 0, indexOffset, MeshTopology.Triangles, 0);
+
+                _mesh.MarkModified();
+
+                var meshCollider = GetComponent<MeshCollider>();
+
+                if (meshCollider != null)
+                {
+                    meshCollider.sharedMesh = _mesh;
                 }
             }
         }
 
-        public void Add(ConvexPolyhedron polyhedron)
+        public bool Add(ConvexPolyhedron polyhedron)
         {
-            if (polyhedron.IsEmpty) return;
+            if (polyhedron.IsEmpty) return false;
 
             Subtract(polyhedron);
             _polyhedra.Add(polyhedron);
+
+            _meshInvalid = true;
+            return true;
         }
 
-        private readonly Queue<(ConvexPolyhedron, int)> _subtractQueue = new Queue<(ConvexPolyhedron, int)>();
-        private readonly List<ConvexFace> _excludedFaces = new List<ConvexFace>();
+        private readonly HashSet<ConvexFace> _excludedFaces = new HashSet<ConvexFace>();
 
-        public void Subtract(ConvexPolyhedron polyhedron)
+        public bool Subtract(ConvexPolyhedron polyhedron)
         {
-            if (polyhedron.IsEmpty) return;
+            if (polyhedron.IsEmpty) return false;
 
-            _subtractQueue.Clear();
+            var changed = false;
 
-            foreach (var poly in _polyhedra)
+            for (var polyIndex = _polyhedra.Count - 1; polyIndex >= 0; --polyIndex)
             {
-                _subtractQueue.Enqueue((poly, 0));
-            }
+                var next = _polyhedra[polyIndex];
 
-            while (_subtractQueue.Count > 0)
-            {
-                var (next, firstFace) = _subtractQueue.Dequeue();
-
-                for (var i = firstFace; i < polyhedron.FaceCount; ++i)
+                int faceIndex;
+                for (faceIndex = 0; faceIndex < polyhedron.FaceCount; ++faceIndex)
                 {
-                    var face = polyhedron.GetFace(i);
+                    var face = polyhedron.GetFace(faceIndex);
 
                     _excludedFaces.Clear();
+                    var (excludedNone, excludedAll) = next.Clip(face.Plane, null, _excludedFaces, dryRun: true);
 
-                    if (!next.Clip(face.Plane, _excludedFaces)) continue;
+                    if (excludedAll) break;
+                    if (excludedNone) continue;
 
-                    if (next.IsEmpty)
+                    var child = new ConvexPolyhedron($"({next.Name}, {polyhedron.Name}) {_nextIndex++}");
+
+                    child.CopyFaces(_excludedFaces);
+
+                    next.Clip(face.Plane, child);
+                    child.Clip(-face.Plane, next);
+
+                    if (!child.IsEmpty)
                     {
-                        _polyhedra.Remove(next);
-                        break;
+                        _polyhedra.Add(child);
+                    }
+                    else
+                    {
+                        next.RemoveNeighbor(face.Plane, child, false);
                     }
 
-                    var child = new ConvexPolyhedron();
+                    changed = true;
+                }
 
-                    foreach (var excludedFace in _excludedFaces)
-                    {
-                        child.Clip(excludedFace.Plane);
-                    }
-
-                    child.Clip(-face.Plane);
-
-                    _polyhedra.Add(child);
-                    _subtractQueue.Enqueue((child, i + 1));
+                if (faceIndex == polyhedron.FaceCount)
+                {
+                    next.Removed();
+                    _polyhedra.Remove(next);
+                    changed = true;
                 }
             }
+
+            _meshInvalid |= changed;
+            return changed;
         }
 
-        void OnDrawGizmos()
+        void OnDrawGizmosSelected()
         {
+            Gizmos.matrix = transform.localToWorldMatrix;
+
             foreach (var poly in _polyhedra)
             {
                 poly.DrawGizmos();
