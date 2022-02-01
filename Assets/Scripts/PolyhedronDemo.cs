@@ -39,6 +39,8 @@ namespace CsgTest
             {
                 _geometryInvalid = false;
 
+                ConvexPolyhedron.NextIndex = 0;
+
                 _polyhedra.Clear();
 
                 foreach (var brush in transform.GetComponentsInChildren<CsgBrush>())
@@ -168,7 +170,7 @@ namespace CsgTest
                     }
                     else
                     {
-                        next.RemoveNeighbor(face.Plane, child, false);
+                        next.ReplaceNeighbor(face.Plane, child, null);
                     }
 
                     changed = true;

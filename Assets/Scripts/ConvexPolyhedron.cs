@@ -44,8 +44,17 @@ namespace CsgTest
 
         private readonly List<ConvexFace> _faces = new List<ConvexFace>();
 
+        public static int NextIndex { get; set; }
+
+        public int Index { get; }
+
         public bool IsEmpty { get; private set; }
         public int FaceCount => _faces.Count;
+
+        public ConvexPolyhedron()
+        {
+            Index = NextIndex++;
+        }
 
         public ConvexFace GetFace(int index)
         {
@@ -109,13 +118,18 @@ namespace CsgTest
             {
                 foreach (var subFace in face.SubFaces)
                 {
-                    subFace.Neighbor?.RemoveNeighbor(-face.Plane, this, false);
+                    subFace.Neighbor?.ReplaceNeighbor(-face.Plane, this, null);
                 }
             }
         }
 
         private void AddNeighbor(BspPlane plane, ConvexPolyhedron neighbor, List<FaceCut> faceCuts)
         {
+            //if (Index == 4 && Math.Abs(plane.Normal.y - (-1f)) < BspSolid.Epsilon)
+            //{
+            //    Debug.Log($"AddNeighbor {neighbor}");
+            //}
+
             foreach (var face in _faces)
             {
                 if (!face.Plane.Equals(plane)) continue;
@@ -129,16 +143,25 @@ namespace CsgTest
                 var basis = face.Plane.GetBasis();
                 var invBasis = (-plane).GetBasis();
 
-                foreach (var invCut in faceCuts)
+                foreach (var cut in faceCuts)
                 {
-                    var cut = invCut.GetCompliment(invBasis, basis);
-                    var (excludeNone, excludeAll) = subFace.FaceCuts.GetNewFaceCutExclusions(cut);
-
-                    if (excludeNone) continue;
-                    if (excludeAll) return;
-
-                    subFace.FaceCuts.AddFaceCut(cut);
+                    subFace.FaceCuts.Add(cut.GetCompliment(invBasis, basis));
                 }
+
+                //foreach (var invCut in faceCuts)
+                //{
+                //    var cut = invCut.GetCompliment(invBasis, basis);
+                //    var (excludeNone, excludeAll) = subFace.FaceCuts.GetNewFaceCutExclusions(cut);
+
+                //    if (excludeNone) continue;
+                //    if (excludeAll)
+                //    {
+                //        Debug.Log("a");
+                //        return;
+                //    }
+
+                //    subFace.FaceCuts.AddFaceCut(cut);
+                //}
 
                 subFace.FaceCuts.Sort(FaceCut.Comparer);
 
@@ -148,8 +171,13 @@ namespace CsgTest
             }
         }
 
-        internal void RemoveNeighbor(BspPlane plane, ConvexPolyhedron neighbor, bool removeSubFace)
+        internal void ReplaceNeighbor(BspPlane plane, ConvexPolyhedron neighbor, ConvexPolyhedron newNeighbor)
         {
+            //if (Index == 4 && Math.Abs(plane.Normal.y - (-1f)) < BspSolid.Epsilon)
+            //{
+            //    Debug.Log($"Replace {neighbor} {newNeighbor?.ToString() ?? "null"}");
+            //}
+
             foreach (var face in _faces)
             {
                 if (!face.Plane.Equals(plane)) continue;
@@ -159,28 +187,26 @@ namespace CsgTest
                     var subFace = face.SubFaces[i];
                     if (subFace.Neighbor != neighbor) continue;
 
-                    if (removeSubFace)
-                    {
-                        face.SubFaces.RemoveAt(i);
-                    }
-                    else
-                    {
-                        subFace.Neighbor = null;
-                        face.SubFaces[i] = subFace;
-                    }
+                    subFace.Neighbor = newNeighbor;
+                    face.SubFaces[i] = subFace;
 
                     return;
                 }
             }
         }
 
-        private void AddSubFaceCut(BspPlane plane, ConvexPolyhedron neighbor, BspPlane cutPlane)
+        private void AddSubFaceCut(BspPlane plane, ConvexPolyhedron neighbor, ConvexPolyhedron newNeighbor, BspPlane cutPlane)
         {
+            //if (Index == 4 && Math.Abs(plane.Normal.y - (-1f)) < BspSolid.Epsilon)
+            //{
+            //    Debug.Log($"AddSubFaceCut {neighbor} {newNeighbor?.ToString() ?? "null"} {cutPlane}");
+            //}
+
             foreach (var face in _faces)
             {
                 if (!face.Plane.Equals(plane)) continue;
 
-                for (var i = 0; i < face.SubFaces.Count; ++i)
+                for (var i = face.SubFaces.Count - 1; i >= 0; --i)
                 {
                     var subFace = face.SubFaces[i];
                     if (subFace.Neighbor != neighbor) continue;
@@ -193,13 +219,24 @@ namespace CsgTest
                     if (excludeNone) return;
                     if (excludeAll)
                     {
-                        subFace.Neighbor = null;
-                        face.SubFaces.RemoveAt(i);
-                        return;
+                        subFace.Neighbor = newNeighbor;
+                        face.SubFaces[i] = subFace;
+                        continue;
                     }
+
+                    var newSubFace = new SubFace
+                    {
+                        FaceCuts = new List<FaceCut>(subFace.FaceCuts),
+                        Neighbor = newNeighbor
+                    };
 
                     subFace.FaceCuts.AddFaceCut(faceCut);
                     subFace.FaceCuts.Sort(FaceCut.Comparer);
+
+                    newSubFace.FaceCuts.AddFaceCut(-faceCut);
+                    newSubFace.FaceCuts.Sort(FaceCut.Comparer);
+
+                    face.SubFaces.Add(newSubFace);
                     return;
                 }
             }
@@ -224,7 +261,7 @@ namespace CsgTest
                         FaceCuts = new List<FaceCut>(subFace.FaceCuts)
                     });
 
-                    subFace.Neighbor?.AddNeighbor(-face.Plane, this, subFace.FaceCuts);
+                    // subFace.Neighbor?.AddNeighbor(-face.Plane, this, subFace.FaceCuts);
                 }
 
                 _faces.Add(copy);
@@ -237,9 +274,6 @@ namespace CsgTest
 
             return !excludedNone;
         }
-
-        [ThreadStatic]
-        private static List<FaceCut> _tempCuts;
 
         /// <summary>
         /// Cuts the polyhedron by the given plane, discarding the negative side.
@@ -287,17 +321,13 @@ namespace CsgTest
 
             if (faceCuts != null && faceCuts.Count > 0)
             {
-                var tempCuts = _tempCuts ?? (_tempCuts = new List<FaceCut>());
-
-                tempCuts.Clear();
-                tempCuts.AddRange(faceCuts);
-
                 for (var i = _faces.Count - 1; i >= 0; --i)
                 {
                     var other = _faces[i];
 
                     var planeCut = Helpers.GetFaceCut(plane, other.Plane, planeBasis, BspSolid.Epsilon * 10f);
-                    var auxExclusions = tempCuts.GetNewFaceCutExclusions(planeCut);
+
+                    var auxExclusions = faceCuts.GetNewFaceCutExclusions(planeCut);
 
                     if (auxExclusions.ExcludesAll)
                     {
@@ -305,21 +335,8 @@ namespace CsgTest
                         //Debug.DrawLine(middle, middle + other.Plane.Normal);
                         //Debug.DrawLine(middle, other.Plane.Normal * other.Plane.Offset);
 
-                        tempCuts.Clear();
-                        break;
+                        return (true, true);
                     }
-
-                    if (auxExclusions.ExcludesNone)
-                    {
-                        continue;
-                    }
-
-                    tempCuts.AddFaceCut(planeCut);
-                }
-
-                if (tempCuts.Count == 0)
-                {
-                    return (true, true);
                 }
             }
 
@@ -363,7 +380,7 @@ namespace CsgTest
                     {
                         foreach (var subFace in other.SubFaces)
                         {
-                            subFace.Neighbor?.RemoveNeighbor(-other.Plane, this, true);
+                            subFace.Neighbor?.ReplaceNeighbor(-other.Plane, this, neighbor);
                         }
 
                         _faces.RemoveAt(i);
@@ -391,7 +408,7 @@ namespace CsgTest
                         if (subFaceExclusions.ExcludesAll)
                         {
                             other.SubFaces.RemoveAt(subFaceIndex);
-                            subFace.Neighbor?.RemoveNeighbor(-other.Plane, this, true);
+                            subFace.Neighbor?.ReplaceNeighbor(-other.Plane, this, neighbor);
                             continue;
                         }
 
@@ -403,7 +420,7 @@ namespace CsgTest
                         subFace.FaceCuts.AddFaceCut(otherCut);
                         subFace.FaceCuts.Sort(FaceCut.Comparer);
 
-                        subFace.Neighbor?.AddSubFaceCut(-other.Plane, this, plane);
+                        subFace.Neighbor?.AddSubFaceCut(-other.Plane, this, neighbor, plane);
                     }
                 }
             }
@@ -515,6 +532,15 @@ namespace CsgTest
                     Gizmos.DrawLine(min, max);
                 }
             }
+
+#if UNITY_EDITOR
+            UnityEditor.Handles.Label(avgPos / posCount, ToString());
+#endif
+        }
+
+        public override string ToString()
+        {
+            return $"[{Index}]";
         }
     }
 
