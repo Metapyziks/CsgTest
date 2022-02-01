@@ -53,6 +53,11 @@ namespace CsgTest
             return basis.origin + basis.tu * pos.x + basis.tv * pos.y;
         }
 
+        public FaceCut GetCompliment(in (float3 origin, float3 tu, float3 tv) oldBasis, in (float3 origin, float3 tu, float3 tv) newBasis)
+        {
+            return Transform(float4x4.identity, float4x4.Scale(-1f), oldBasis, newBasis);
+        }
+
         public int CompareTo(FaceCut other)
         {
             return Angle.CompareTo(other.Angle);
@@ -98,7 +103,7 @@ namespace CsgTest
             var min = Min;
             var max = Max;
 
-            var tangent = new float2(-Normal.y, Normal.x);
+            var tangent = new float2(-newNormal.y, newNormal.x);
 
             if (!float.IsNegativeInfinity(min))
             {
@@ -116,7 +121,7 @@ namespace CsgTest
                 max = math.dot(maxPos, tangent);
             }
 
-            return new FaceCut(newNormal, math.dot(normal3, pos - newBasis.origin), min, max);
+            return new FaceCut(newNormal, math.dot(normal3, pos - newBasis.origin), math.min(min, max), math.max(min, max));
         }
     }
 

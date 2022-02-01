@@ -50,7 +50,7 @@ namespace CsgTest
             return (origin, tu, tv);
         }
 
-        public static FaceCut GetFaceCut(BspPlane plane, BspPlane cutPlane, in (float3 origin, float3 tu, float3 tv) basis)
+        public static FaceCut GetFaceCut(BspPlane plane, BspPlane cutPlane, in (float3 origin, float3 tu, float3 tv) basis, float bias = 0f)
         {
             var cutTangent = math.cross(plane.Normal, cutPlane.Normal);
 
@@ -58,7 +58,9 @@ namespace CsgTest
             {
                 // If this cut completely excludes the original plane, return a FaceCut that also excludes everything
 
-                return plane.Offset * math.dot(plane.Normal, cutPlane.Normal) > cutPlane.Offset + BspSolid.Epsilon
+                var dot = math.dot(plane.Normal, cutPlane.Normal);
+
+                return plane.Offset * dot > cutPlane.Offset - BspSolid.Epsilon * dot
                     ? FaceCut.ExcludeNone
                     : FaceCut.ExcludeAll;
             }
@@ -76,7 +78,7 @@ namespace CsgTest
             var t = math.dot(cutPlane.Normal * cutPlane.Offset - basis.origin, cutPlane.Normal)
                     / math.dot(cutPlane.Normal, cutNormal);
 
-            return new FaceCut(cutNormal2, t, float.NegativeInfinity, float.PositiveInfinity);
+            return new FaceCut(cutNormal2, t + bias, float.NegativeInfinity, float.PositiveInfinity);
         }
 
         public static (bool ExcludesNone, bool ExcludesAll) GetNewFaceCutExclusions(this List<FaceCut> faceCuts, FaceCut cut)
@@ -97,6 +99,8 @@ namespace CsgTest
 
             foreach (var other in faceCuts)
             {
+                if (other.Equals(cut)) return (true, false);
+
                 var cross = Helpers.Cross(cut.Normal, other.Normal);
                 var dot = math.dot(cut.Normal, other.Normal);
 
@@ -163,7 +167,7 @@ namespace CsgTest
             for (var i = faceCuts.Count - 1; i >= 0; --i)
             {
                 var other = faceCuts[i];
-                var cross = Helpers.Cross(cut.Normal, other.Normal);
+                var cross = Cross(cut.Normal, other.Normal);
                 var dot = math.dot(cut.Normal, other.Normal);
 
                 if (math.abs(cross) <= BspSolid.Epsilon)
@@ -172,7 +176,8 @@ namespace CsgTest
                     {
                         if (cut.Distance * dot < other.Distance)
                         {
-                            throw new Exception();
+                            faceCuts.Clear();
+                            return false;
                         }
 
                         faceCuts.RemoveAt(i);
@@ -219,6 +224,25 @@ namespace CsgTest
 
             faceCuts.Add(cut);
             return true;
+        }
+
+        public static float3 DebugDraw(this List<FaceCut> faceCuts, in (float3 origin, float3 tu, float3 tv) basis, Color color)
+        {
+            var avg = float3.zero;
+            var pointCount = 0;
+
+            foreach (var faceCut in faceCuts)
+            {
+                var a = faceCut.GetPoint(basis, faceCut.Min);
+                var b = faceCut.GetPoint(basis, faceCut.Max);
+
+                avg += a + b;
+                pointCount += 2;
+
+                Debug.DrawLine(a, b, color);
+            }
+
+            return avg / pointCount;
         }
     }
 }

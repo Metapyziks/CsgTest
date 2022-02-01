@@ -21,8 +21,6 @@ namespace CsgTest
         private ushort[] _indices;
         private Mesh _mesh;
 
-        private int _nextIndex;
-
         void Start()
         {
             _geometryInvalid = true;
@@ -41,7 +39,6 @@ namespace CsgTest
             {
                 _geometryInvalid = false;
 
-                _nextIndex = 0;
                 _polyhedra.Clear();
 
                 foreach (var brush in transform.GetComponentsInChildren<CsgBrush>())
@@ -51,8 +48,6 @@ namespace CsgTest
                         : ConvexPolyhedron.CreateDodecahedron(Vector3.zero, 0.5f);
                     var matrix = brush.transform.localToWorldMatrix;
                     var normalMatrix = math.transpose(math.inverse(matrix));
-
-                    shape.Name = $"{brush.name} {_nextIndex++}";
 
                     shape.Transform(matrix, normalMatrix);
 
@@ -137,24 +132,35 @@ namespace CsgTest
             for (var polyIndex = _polyhedra.Count - 1; polyIndex >= 0; --polyIndex)
             {
                 var next = _polyhedra[polyIndex];
+                var allInside = true;
+                var skippedCount = 0;
 
-                int faceIndex;
-                for (faceIndex = 0; faceIndex < polyhedron.FaceCount; ++faceIndex)
+                for (var faceIndex = 0; faceIndex < polyhedron.FaceCount; ++faceIndex)
                 {
                     var face = polyhedron.GetFace(faceIndex);
 
                     _excludedFaces.Clear();
-                    var (excludedNone, excludedAll) = next.Clip(face.Plane, null, _excludedFaces, dryRun: true);
+                    var (excludedNone, excludedAll) = next.Clip(face.Plane, face.FaceCuts, null, _excludedFaces, dryRun: true);
 
-                    if (excludedAll) break;
+                    if (excludedAll && excludedNone)
+                    {
+                        ++skippedCount;
+                    }
+
                     if (excludedNone) continue;
 
-                    var child = new ConvexPolyhedron($"({next.Name}, {polyhedron.Name}) {_nextIndex++}");
+                    if (excludedAll)
+                    {
+                        allInside = false;
+                        break;
+                    }
+
+                    var child = new ConvexPolyhedron();
 
                     child.CopyFaces(_excludedFaces);
 
-                    next.Clip(face.Plane, child);
-                    child.Clip(-face.Plane, next);
+                    next.Clip(face.Plane, null, child);
+                    child.Clip(-face.Plane, null, next);
 
                     if (!child.IsEmpty)
                     {
@@ -168,7 +174,7 @@ namespace CsgTest
                     changed = true;
                 }
 
-                if (faceIndex == polyhedron.FaceCount)
+                if (allInside && skippedCount != polyhedron.FaceCount)
                 {
                     next.Removed();
                     _polyhedra.Remove(next);

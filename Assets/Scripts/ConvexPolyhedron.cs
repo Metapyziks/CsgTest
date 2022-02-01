@@ -1,8 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Assertions;
@@ -13,31 +10,31 @@ namespace CsgTest
     {
         public static ConvexPolyhedron CreateCube(Bounds bounds)
         {
-            var mesh = new ConvexPolyhedron("Cube");
+            var mesh = new ConvexPolyhedron();
 
-            mesh.Clip(new BspPlane(new float3(1f, 0f, 0f), bounds.min), null);
-            mesh.Clip(new BspPlane(new float3(-1f, 0f, 0f), bounds.max), null);
-            mesh.Clip(new BspPlane(new float3(0f, 1f, 0f), bounds.min), null);
-            mesh.Clip(new BspPlane(new float3(0f, -1f, 0f), bounds.max), null);
-            mesh.Clip(new BspPlane(new float3(0f, 0f, 1f), bounds.min), null);
-            mesh.Clip(new BspPlane(new float3(0f, 0f, -1f), bounds.max), null);
+            mesh.Clip(new BspPlane(new float3(1f, 0f, 0f), bounds.min));
+            mesh.Clip(new BspPlane(new float3(-1f, 0f, 0f), bounds.max));
+            mesh.Clip(new BspPlane(new float3(0f, 1f, 0f), bounds.min));
+            mesh.Clip(new BspPlane(new float3(0f, -1f, 0f), bounds.max));
+            mesh.Clip(new BspPlane(new float3(0f, 0f, 1f), bounds.min));
+            mesh.Clip(new BspPlane(new float3(0f, 0f, -1f), bounds.max));
 
             return mesh;
         }
 
         public static ConvexPolyhedron CreateDodecahedron(float3 center, float radius)
         {
-            var mesh = new ConvexPolyhedron("Dodecahedron");
+            var mesh = new ConvexPolyhedron();
 
-            mesh.Clip(new BspPlane(new float3(0f, 1f, 0f), -radius), null);
-            mesh.Clip(new BspPlane(new float3(0f, -1f, 0f), -radius), null);
+            mesh.Clip(new BspPlane(new float3(0f, 1f, 0f), -radius));
+            mesh.Clip(new BspPlane(new float3(0f, -1f, 0f), -radius));
 
             var rot = Quaternion.AngleAxis(60f, Vector3.right);
 
             for (var i = 0; i < 5; ++i)
             {
-                mesh.Clip(new BspPlane(rot * Vector3.down, -radius), null);
-                mesh.Clip(new BspPlane(rot * Vector3.up, -radius), null);
+                mesh.Clip(new BspPlane(rot * Vector3.down, -radius));
+                mesh.Clip(new BspPlane(rot * Vector3.up, -radius));
 
                 rot = Quaternion.AngleAxis(72f, Vector3.up) * rot;
             }
@@ -47,15 +44,8 @@ namespace CsgTest
 
         private readonly List<ConvexFace> _faces = new List<ConvexFace>();
 
-        public string Name { get; set; }
-
         public bool IsEmpty { get; private set; }
         public int FaceCount => _faces.Count;
-
-        public ConvexPolyhedron(string name)
-        {
-            Name = name;
-        }
 
         public ConvexFace GetFace(int index)
         {
@@ -141,10 +131,7 @@ namespace CsgTest
 
                 foreach (var invCut in faceCuts)
                 {
-                    var normal3 = invCut.Normal.x * invBasis.tu + invCut.Normal.y * invBasis.tv;
-                    var cutPlane = new BspPlane(normal3, normal3 * invCut.Distance);
-
-                    var cut = Helpers.GetFaceCut(face.Plane, cutPlane, basis);
+                    var cut = invCut.GetCompliment(invBasis, basis);
                     var (excludeNone, excludeAll) = subFace.FaceCuts.GetNewFaceCutExclusions(cut);
 
                     if (excludeNone) continue;
@@ -244,12 +231,22 @@ namespace CsgTest
             }
         }
 
+        public bool Clip(BspPlane plane)
+        {
+            var (excludedNone, excludedAll) = Clip(plane, null, null);
+
+            return !excludedNone;
+        }
+
+        [ThreadStatic]
+        private static List<FaceCut> _tempCuts;
+
         /// <summary>
         /// Cuts the polyhedron by the given plane, discarding the negative side.
         /// </summary>
         /// <param name="plane">Plane to clip by.</param>
         /// <returns>True if anything was clipped.</returns>
-        public (bool ExcludedNone, bool ExcludedAll) Clip(BspPlane plane,
+        internal (bool ExcludedNone, bool ExcludedAll) Clip(BspPlane plane, List<FaceCut> faceCuts,
             ConvexPolyhedron neighbor, HashSet<ConvexFace> excluded = null, bool dryRun = false)
         {
             if (IsEmpty)
@@ -287,6 +284,44 @@ namespace CsgTest
             var anyIntersections = false;
             var excludedAny = false;
             var remainingFacesCount = _faces.Count;
+
+            if (faceCuts != null && faceCuts.Count > 0)
+            {
+                var tempCuts = _tempCuts ?? (_tempCuts = new List<FaceCut>());
+
+                tempCuts.Clear();
+                tempCuts.AddRange(faceCuts);
+
+                for (var i = _faces.Count - 1; i >= 0; --i)
+                {
+                    var other = _faces[i];
+
+                    var planeCut = Helpers.GetFaceCut(plane, other.Plane, planeBasis, BspSolid.Epsilon * 10f);
+                    var auxExclusions = tempCuts.GetNewFaceCutExclusions(planeCut);
+
+                    if (auxExclusions.ExcludesAll)
+                    {
+                        //var middle = tempCuts.DebugDraw(planeBasis, Color.red);
+                        //Debug.DrawLine(middle, middle + other.Plane.Normal);
+                        //Debug.DrawLine(middle, other.Plane.Normal * other.Plane.Offset);
+
+                        tempCuts.Clear();
+                        break;
+                    }
+
+                    if (auxExclusions.ExcludesNone)
+                    {
+                        continue;
+                    }
+
+                    tempCuts.AddFaceCut(planeCut);
+                }
+
+                if (tempCuts.Count == 0)
+                {
+                    return (true, true);
+                }
+            }
 
             for (var i = _faces.Count - 1; i >= 0; --i)
             {
@@ -480,15 +515,6 @@ namespace CsgTest
                     Gizmos.DrawLine(min, max);
                 }
             }
-
-#if UNITY_EDITOR
-            UnityEditor.Handles.Label(avgPos / posCount, Name);
-#endif
-        }
-
-        public override string ToString()
-        {
-            return Name ?? "Unnamed";
         }
     }
 
