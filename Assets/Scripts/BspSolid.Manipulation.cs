@@ -120,11 +120,9 @@ namespace CsgTest
 
                 planes = _sTempPlanes;
 
-                var normalTransform = math.transpose(math.inverse(transform.Value));
-
                 for (var i = 0; i < solid._planeCount; ++i)
                 {
-                    planes[i] = solid._planes[i].Transform(transform.Value, normalTransform);
+                    planes[i] = solid._planes[i].Transform(transform.Value);
                 }
             }
 

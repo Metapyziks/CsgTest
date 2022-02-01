@@ -124,11 +124,9 @@ namespace CsgTest
 
         public void Transform(float4x4 matrix)
         {
-            var transInvMatrix = math.transpose(math.inverse(matrix));
-
             for (var i = 0; i < _planeCount; ++i)
             {
-                _planes[i] = _planes[i].Transform(matrix, transInvMatrix);
+                _planes[i] = _planes[i].Transform(matrix);
             }
         }
 

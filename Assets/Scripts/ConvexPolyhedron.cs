@@ -48,6 +48,8 @@ namespace CsgTest
 
         public int Index { get; }
 
+        public int MaterialIndex { get; set; }
+
         public bool IsEmpty { get; private set; }
         public int FaceCount => _faces.Count;
 
@@ -60,14 +62,8 @@ namespace CsgTest
         {
             return _faces[index];
         }
-
+        
         public void Transform(in float4x4 matrix)
-        {
-            var normalMatrix = math.transpose(math.inverse(matrix));
-            Transform(matrix, normalMatrix);
-        }
-
-        public void Transform(in float4x4 matrix, in float4x4 normalMatrix)
         {
             for (var i = 0; i < _faces.Count; ++i)
             {
@@ -75,21 +71,25 @@ namespace CsgTest
 
                 var oldBasis = face.Plane.GetBasis();
 
-                face.Plane = face.Plane.Transform(matrix, normalMatrix);
+                face.Plane = face.Plane.Transform(matrix);
 
                 var newBasis = face.Plane.GetBasis();
 
                 for (var j = 0; j < face.FaceCuts.Count; ++j)
                 {
-                    face.FaceCuts[j] = face.FaceCuts[j].Transform(matrix, normalMatrix, oldBasis, newBasis);
+                    face.FaceCuts[j] = face.FaceCuts[j].Transform(matrix, oldBasis, newBasis);
                 }
+
+                face.FaceCuts.Sort(FaceCut.Comparer);
 
                 foreach (var subFace in face.SubFaces)
                 {
                     for (var j = 0; j < subFace.FaceCuts.Count; ++j)
                     {
-                        subFace.FaceCuts[j] = subFace.FaceCuts[j].Transform(matrix, normalMatrix, oldBasis, newBasis);
+                        subFace.FaceCuts[j] = subFace.FaceCuts[j].Transform(matrix, oldBasis, newBasis);
                     }
+
+                    subFace.FaceCuts.Sort(FaceCut.Comparer);
                 }
 
                 _faces[i] = face;
@@ -120,54 +120,6 @@ namespace CsgTest
                 {
                     subFace.Neighbor?.ReplaceNeighbor(-face.Plane, this, null);
                 }
-            }
-        }
-
-        private void AddNeighbor(BspPlane plane, ConvexPolyhedron neighbor, List<FaceCut> faceCuts)
-        {
-            //if (Index == 4 && Math.Abs(plane.Normal.y - (-1f)) < BspSolid.Epsilon)
-            //{
-            //    Debug.Log($"AddNeighbor {neighbor}");
-            //}
-
-            foreach (var face in _faces)
-            {
-                if (!face.Plane.Equals(plane)) continue;
-
-                var subFace = new SubFace
-                {
-                    Neighbor = neighbor,
-                    FaceCuts = new List<FaceCut>(faceCuts.Count)
-                };
-
-                var basis = face.Plane.GetBasis();
-                var invBasis = (-plane).GetBasis();
-
-                foreach (var cut in faceCuts)
-                {
-                    subFace.FaceCuts.Add(cut.GetCompliment(invBasis, basis));
-                }
-
-                //foreach (var invCut in faceCuts)
-                //{
-                //    var cut = invCut.GetCompliment(invBasis, basis);
-                //    var (excludeNone, excludeAll) = subFace.FaceCuts.GetNewFaceCutExclusions(cut);
-
-                //    if (excludeNone) continue;
-                //    if (excludeAll)
-                //    {
-                //        Debug.Log("a");
-                //        return;
-                //    }
-
-                //    subFace.FaceCuts.AddFaceCut(cut);
-                //}
-
-                subFace.FaceCuts.Sort(FaceCut.Comparer);
-
-                face.SubFaces.Add(subFace);
-
-                break;
             }
         }
 
@@ -280,7 +232,7 @@ namespace CsgTest
         /// </summary>
         /// <param name="plane">Plane to clip by.</param>
         /// <returns>True if anything was clipped.</returns>
-        internal (bool ExcludedNone, bool ExcludedAll) Clip(BspPlane plane, List<FaceCut> faceCuts,
+        internal (bool ExcludedNone, bool ExcludedAll) Clip(BspPlane plane,
             ConvexPolyhedron neighbor, HashSet<ConvexFace> excluded = null, bool dryRun = false)
         {
             if (IsEmpty)
@@ -318,27 +270,6 @@ namespace CsgTest
             var anyIntersections = false;
             var excludedAny = false;
             var remainingFacesCount = _faces.Count;
-
-            if (faceCuts != null && faceCuts.Count > 0)
-            {
-                for (var i = _faces.Count - 1; i >= 0; --i)
-                {
-                    var other = _faces[i];
-
-                    var planeCut = Helpers.GetFaceCut(plane, other.Plane, planeBasis, BspSolid.Epsilon * 10f);
-
-                    var auxExclusions = faceCuts.GetNewFaceCutExclusions(planeCut);
-
-                    if (auxExclusions.ExcludesAll)
-                    {
-                        //var middle = tempCuts.DebugDraw(planeBasis, Color.red);
-                        //Debug.DrawLine(middle, middle + other.Plane.Normal);
-                        //Debug.DrawLine(middle, other.Plane.Normal * other.Plane.Offset);
-
-                        return (true, true);
-                    }
-                }
-            }
 
             for (var i = _faces.Count - 1; i >= 0; --i)
             {
@@ -480,7 +411,7 @@ namespace CsgTest
         }
 
         public void WriteMesh(ref int vertexOffset, ref int indexOffset,
-            Vector3[] vertices, Vector3[] normals, ushort[] indices)
+            Vector3[] vertices, Vector3[] normals, Vector4[] texCoords, ushort[] indices)
         {
             foreach (var face in _faces)
             {
@@ -496,8 +427,15 @@ namespace CsgTest
 
                     foreach (var cut in subFace.FaceCuts)
                     {
-                        vertices[vertexOffset] = cut.GetPoint(basis, cut.Max);
+                        var vertex = cut.GetPoint(basis, cut.Max);
+
+                        vertices[vertexOffset] = vertex;
                         normals[vertexOffset] = normal;
+                        texCoords[vertexOffset] = new Vector4(
+                            math.dot(basis.tu, vertex),
+                            math.dot(basis.tv, vertex),
+                            MaterialIndex,
+                            0f);
 
                         ++vertexOffset;
                     }

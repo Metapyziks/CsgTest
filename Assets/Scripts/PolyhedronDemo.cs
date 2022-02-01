@@ -18,6 +18,7 @@ namespace CsgTest
 
         private Vector3[] _vertices;
         private Vector3[] _normals;
+        private Vector4[] _texCoords;
         private ushort[] _indices;
         private Mesh _mesh;
 
@@ -49,9 +50,9 @@ namespace CsgTest
                         ? ConvexPolyhedron.CreateCube(new Bounds(Vector3.zero, Vector3.one))
                         : ConvexPolyhedron.CreateDodecahedron(Vector3.zero, 0.5f);
                     var matrix = brush.transform.localToWorldMatrix;
-                    var normalMatrix = math.transpose(math.inverse(matrix));
 
-                    shape.Transform(matrix, normalMatrix);
+                    shape.MaterialIndex = brush.MaterialIndex;
+                    shape.Transform(matrix);
 
                     switch (brush.Operator)
                     {
@@ -91,14 +92,17 @@ namespace CsgTest
 
                     Helpers.EnsureCapacity(ref _vertices, vertexOffset + vertexCount);
                     Helpers.EnsureCapacity(ref _normals, vertexOffset + vertexCount);
+                    Helpers.EnsureCapacity(ref _texCoords, vertexOffset + vertexCount);
                     Helpers.EnsureCapacity(ref _indices, indexOffset + faceCount * 3);
 
-                    poly.WriteMesh(ref vertexOffset, ref indexOffset, _vertices, _normals, _indices);
+                    poly.WriteMesh(ref vertexOffset, ref indexOffset,
+                        _vertices, _normals, _texCoords, _indices);
                 }
 
                 _mesh.Clear();
                 _mesh.SetVertices(_vertices, 0, vertexOffset);
                 _mesh.SetNormals(_normals, 0, vertexOffset);
+                _mesh.SetUVs(0, _texCoords, 0, vertexOffset);
                 _mesh.SetIndices(_indices, 0, indexOffset, MeshTopology.Triangles, 0);
 
                 _mesh.MarkModified();
@@ -134,20 +138,15 @@ namespace CsgTest
             for (var polyIndex = _polyhedra.Count - 1; polyIndex >= 0; --polyIndex)
             {
                 var next = _polyhedra[polyIndex];
+
                 var allInside = true;
-                var skippedCount = 0;
 
                 for (var faceIndex = 0; faceIndex < polyhedron.FaceCount; ++faceIndex)
                 {
                     var face = polyhedron.GetFace(faceIndex);
 
                     _excludedFaces.Clear();
-                    var (excludedNone, excludedAll) = next.Clip(face.Plane, face.FaceCuts, null, _excludedFaces, dryRun: true);
-
-                    if (excludedAll && excludedNone)
-                    {
-                        ++skippedCount;
-                    }
+                    var (excludedNone, excludedAll) = next.Clip(face.Plane, null, _excludedFaces, dryRun: true);
 
                     if (excludedNone) continue;
 
@@ -157,12 +156,15 @@ namespace CsgTest
                         break;
                     }
 
-                    var child = new ConvexPolyhedron();
+                    var child = new ConvexPolyhedron
+                    {
+                        MaterialIndex = next.MaterialIndex
+                    };
 
                     child.CopyFaces(_excludedFaces);
 
-                    next.Clip(face.Plane, null, child);
-                    child.Clip(-face.Plane, null, next);
+                    next.Clip(face.Plane, child);
+                    child.Clip(-face.Plane, next);
 
                     if (!child.IsEmpty)
                     {
@@ -176,7 +178,7 @@ namespace CsgTest
                     changed = true;
                 }
 
-                if (allInside && skippedCount != polyhedron.FaceCount)
+                if (allInside)
                 {
                     next.Removed();
                     _polyhedra.Remove(next);

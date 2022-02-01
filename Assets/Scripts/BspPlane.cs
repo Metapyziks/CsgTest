@@ -30,11 +30,14 @@ namespace CsgTest
             Offset = offset;
         }
 
-        public BspPlane Transform(in float4x4 matrix, in float4x4 transInvMatrix)
+        public BspPlane Transform(in float4x4 matrix)
         {
-            var position = math.transform(matrix, Normal * Offset);
-            var normal = math.mul(transInvMatrix, new float4(Normal, 0f)).xyz;
-            return new BspPlane(normal, position);
+            var basis = this.GetBasis();
+            var position = math.transform(matrix, basis.origin);
+            var p1 = math.transform(matrix, basis.origin + basis.tu);
+            var p2 = math.transform(matrix, basis.origin + basis.tv);
+
+            return new BspPlane(math.cross(p2 - position, p1 - position), position);
         }
 
         public bool Equals(BspPlane other)

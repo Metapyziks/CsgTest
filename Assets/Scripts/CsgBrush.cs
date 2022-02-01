@@ -23,6 +23,7 @@ namespace CsgTest
     {
         public BrushOperator Operator;
         public Primitive Primitive;
+        public int MaterialIndex;
 
         private void OnDrawGizmosSelected()
         {
