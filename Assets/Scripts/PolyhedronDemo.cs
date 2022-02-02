@@ -146,9 +146,13 @@ namespace CsgTest
                     var face = polyhedron.GetFace(faceIndex);
 
                     _excludedFaces.Clear();
-                    var (excludedNone, excludedAll) = next.Clip(face.Plane, null, _excludedFaces, dryRun: true);
+                    var (excludedNone, excludedAll) = next.Clip(face.Plane,
+                        face.FaceCuts, null, _excludedFaces, dryRun: true);
 
-                    if (excludedNone) continue;
+                    if (excludedNone)
+                    {
+                        continue;
+                    }
 
                     if (excludedAll)
                     {
@@ -163,8 +167,8 @@ namespace CsgTest
 
                     child.CopyFaces(_excludedFaces);
 
-                    next.Clip(face.Plane, child);
-                    child.Clip(-face.Plane, next);
+                    next.Clip(face.Plane, null, child);
+                    child.Clip(-face.Plane, null, next);
 
                     if (!child.IsEmpty)
                     {
@@ -178,12 +182,24 @@ namespace CsgTest
                     changed = true;
                 }
 
-                if (allInside)
+                if (!allInside) continue;
+
+                for (var faceIndex = 0; faceIndex < polyhedron.FaceCount; ++faceIndex)
                 {
-                    next.Removed();
-                    _polyhedra.Remove(next);
-                    changed = true;
+                    var face = polyhedron.GetFace(faceIndex);
+
+                    if (math.dot(face.Plane.Normal, next.VertexAverage) <= face.Plane.Offset)
+                    {
+                        allInside = false;
+                        break;
+                    }
                 }
+
+                if (!allInside) continue;
+
+                next.Removed();
+                _polyhedra.Remove(next);
+                changed = true;
             }
 
             _meshInvalid |= changed;

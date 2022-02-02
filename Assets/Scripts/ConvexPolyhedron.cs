@@ -53,6 +53,39 @@ namespace CsgTest
         public bool IsEmpty { get; private set; }
         public int FaceCount => _faces.Count;
 
+        private bool _vertexAverageInvalid;
+        private float3 _vertexAverage;
+
+        public float3 VertexAverage
+        {
+            get
+            {
+                if (!_vertexAverageInvalid) return _vertexAverage;
+                if (IsEmpty || _faces.Count == 0) return float3.zero;
+
+                _vertexAverageInvalid = false;
+
+                var avgPos = float3.zero;
+                var posCount = 0;
+
+                foreach (var face in _faces)
+                {
+                    var basis = face.Plane.GetBasis();
+
+                    foreach (var cut in face.FaceCuts)
+                    {
+                        var min = cut.GetPoint(basis, cut.Min);
+                        var max = cut.GetPoint(basis, cut.Max);
+
+                        avgPos += min + max;
+                        posCount += 2;
+                    }
+                }
+
+                return _vertexAverage = avgPos / posCount;
+            }
+        }
+
         public ConvexPolyhedron()
         {
             Index = NextIndex++;
@@ -65,6 +98,8 @@ namespace CsgTest
         
         public void Transform(in float4x4 matrix)
         {
+            _vertexAverageInvalid = true;
+
             for (var i = 0; i < _faces.Count; ++i)
             {
                 var face = _faces[i];
@@ -102,6 +137,7 @@ namespace CsgTest
 
             _faces.Clear();
             IsEmpty = false;
+            _vertexAverageInvalid = true;
         }
 
         private void SetEmpty()
@@ -110,6 +146,7 @@ namespace CsgTest
 
             _faces.Clear();
             IsEmpty = true;
+            _vertexAverageInvalid = true;
         }
 
         internal void Removed()
@@ -196,6 +233,8 @@ namespace CsgTest
 
         internal void CopyFaces(HashSet<ConvexFace> faces)
         {
+            _vertexAverageInvalid = true;
+
             foreach (var face in faces)
             {
                 var copy = new ConvexFace
@@ -232,7 +271,7 @@ namespace CsgTest
         /// </summary>
         /// <param name="plane">Plane to clip by.</param>
         /// <returns>True if anything was clipped.</returns>
-        internal (bool ExcludedNone, bool ExcludedAll) Clip(BspPlane plane,
+        internal (bool ExcludedNone, bool ExcludedAll) Clip(BspPlane plane, List<FaceCut> faceCuts,
             ConvexPolyhedron neighbor, HashSet<ConvexFace> excluded = null, bool dryRun = false)
         {
             if (IsEmpty)
@@ -260,6 +299,7 @@ namespace CsgTest
                     };
 
                     _faces.Add(face);
+                    _vertexAverageInvalid = true;
                 }
 
                 return (false, false);
@@ -270,6 +310,27 @@ namespace CsgTest
             var anyIntersections = false;
             var excludedAny = false;
             var remainingFacesCount = _faces.Count;
+
+            if (faceCuts != null && faceCuts.Count > 0)
+            {
+                for (var i = _faces.Count - 1; i >= 0; --i)
+                {
+                    var other = _faces[i];
+
+                    var planeCut = Helpers.GetFaceCut(plane, other.Plane, planeBasis, BspSolid.Epsilon * 10f);
+
+                    var auxExclusions = faceCuts.GetNewFaceCutExclusions(planeCut);
+
+                    if (auxExclusions.ExcludesAll)
+                    {
+                        //var middle = tempCuts.DebugDraw(planeBasis, Color.red);
+                        //Debug.DrawLine(middle, middle + other.Plane.Normal);
+                        //Debug.DrawLine(middle, other.Plane.Normal * other.Plane.Offset);
+
+                        return (true, true);
+                    }
+                }
+            }
 
             for (var i = _faces.Count - 1; i >= 0; --i)
             {
@@ -315,6 +376,7 @@ namespace CsgTest
                         }
 
                         _faces.RemoveAt(i);
+                        _vertexAverageInvalid = true;
                     }
 
                     --remainingFacesCount;
@@ -328,6 +390,8 @@ namespace CsgTest
 
                 if (!otherExclusions.ExcludesNone && !dryRun)
                 {
+                    _vertexAverageInvalid = true;
+
                     other.FaceCuts.AddFaceCut(otherCut);
                     other.FaceCuts.Sort(FaceCut.Comparer);
 
@@ -385,6 +449,7 @@ namespace CsgTest
                 };
 
                 _faces.Add(face);
+                _vertexAverageInvalid = true;
             }
 
             return (false, false);
@@ -452,9 +517,6 @@ namespace CsgTest
 
         public void DrawGizmos()
         {
-            var avgPos = float3.zero;
-            var posCount = 0;
-
             foreach (var face in _faces)
             {
                 var basis = face.Plane.GetBasis();
@@ -464,15 +526,12 @@ namespace CsgTest
                     var min = cut.GetPoint(basis, cut.Min);
                     var max = cut.GetPoint(basis, cut.Max);
 
-                    avgPos += min + max;
-                    posCount += 2;
-
                     Gizmos.DrawLine(min, max);
                 }
             }
 
 #if UNITY_EDITOR
-            UnityEditor.Handles.Label(avgPos / posCount, ToString());
+            UnityEditor.Handles.Label(VertexAverage, ToString());
 #endif
         }
 
