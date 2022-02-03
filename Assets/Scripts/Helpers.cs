@@ -60,7 +60,7 @@ namespace CsgTest
 
                 var dot = math.dot(plane.Normal, cutPlane.Normal);
 
-                return plane.Offset * dot > cutPlane.Offset - BspSolid.Epsilon * dot
+                return plane.Offset * dot > cutPlane.Offset + BspSolid.Epsilon * dot
                     ? FaceCut.ExcludeNone
                     : FaceCut.ExcludeAll;
             }

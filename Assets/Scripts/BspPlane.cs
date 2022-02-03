@@ -11,6 +11,16 @@ namespace CsgTest
             return new BspPlane(-plane.Normal, -plane.Offset);
         }
 
+        public static BspPlane operator +(BspPlane plane, float offset)
+        {
+            return new BspPlane(plane.Normal, plane.Offset + offset);
+        }
+
+        public static BspPlane operator -(BspPlane plane, float offset)
+        {
+            return new BspPlane(plane.Normal, plane.Offset - offset);
+        }
+
         [JsonProperty("normal")]
         public readonly float3 Normal;
 
