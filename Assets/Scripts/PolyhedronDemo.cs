@@ -13,6 +13,9 @@ namespace CsgTest
     {
         private readonly List<ConvexPolyhedron> _polyhedra = new List<ConvexPolyhedron>();
 
+        private readonly HashSet<ConvexPolyhedron> _visited = new HashSet<ConvexPolyhedron>();
+        private readonly Queue<ConvexPolyhedron> _visitQueue = new Queue<ConvexPolyhedron>();
+
         private bool _geometryInvalid;
         private bool _meshInvalid;
 
@@ -21,6 +24,8 @@ namespace CsgTest
         private Vector4[] _texCoords;
         private ushort[] _indices;
         private Mesh _mesh;
+
+        public Transform Anchor;
 
         void Start()
         {
@@ -63,6 +68,13 @@ namespace CsgTest
             {
                 _meshInvalid = false;
 
+#if UNITY_EDITOR
+                if (UnityEditor.EditorApplication.isPlaying)
+#endif
+                {
+                    RemoveDisconnectedPolyhedra();
+                }
+
                 if (_mesh == null)
                 {
                     var meshFilter = GetComponent<MeshFilter>();
@@ -75,29 +87,7 @@ namespace CsgTest
                     _mesh.MarkDynamic();
                 }
 
-                var indexOffset = 0;
-                var vertexOffset = 0;
-
-                foreach (var poly in _polyhedra)
-                {
-                    var (faceCount, vertexCount) = poly.GetMeshInfo();
-
-                    Helpers.EnsureCapacity(ref _vertices, vertexOffset + vertexCount);
-                    Helpers.EnsureCapacity(ref _normals, vertexOffset + vertexCount);
-                    Helpers.EnsureCapacity(ref _texCoords, vertexOffset + vertexCount);
-                    Helpers.EnsureCapacity(ref _indices, indexOffset + faceCount * 3);
-
-                    poly.WriteMesh(ref vertexOffset, ref indexOffset,
-                        _vertices, _normals, _texCoords, _indices);
-                }
-
-                _mesh.Clear();
-                _mesh.SetVertices(_vertices, 0, vertexOffset);
-                _mesh.SetNormals(_normals, 0, vertexOffset);
-                _mesh.SetUVs(0, _texCoords, 0, vertexOffset);
-                _mesh.SetIndices(_indices, 0, indexOffset, MeshTopology.Triangles, 0);
-
-                _mesh.MarkModified();
+                UpdateMesh(_mesh, _polyhedra);
 
                 var meshCollider = GetComponent<MeshCollider>();
 
@@ -106,6 +96,102 @@ namespace CsgTest
                     meshCollider.sharedMesh = _mesh;
                 }
             }
+        }
+
+        private void UpdateMesh(Mesh mesh, List<ConvexPolyhedron> polyhedra)
+        {
+            UpdateMesh(mesh, polyhedra, 0, polyhedra.Count);
+        }
+
+        private void UpdateMesh(Mesh mesh, List<ConvexPolyhedron> polyhedra, int offset, int count)
+        {
+            var indexOffset = 0;
+            var vertexOffset = 0;
+
+            for (var i = offset; i < offset + count; ++i)
+            {
+                var poly = polyhedra[i];
+                var (faceCount, vertexCount) = poly.GetMeshInfo();
+
+                Helpers.EnsureCapacity(ref _vertices, vertexOffset + vertexCount);
+                Helpers.EnsureCapacity(ref _normals, vertexOffset + vertexCount);
+                Helpers.EnsureCapacity(ref _texCoords, vertexOffset + vertexCount);
+                Helpers.EnsureCapacity(ref _indices, indexOffset + faceCount * 3);
+
+                poly.WriteMesh(ref vertexOffset, ref indexOffset,
+                    _vertices, _normals, _texCoords, _indices);
+            }
+
+            mesh.Clear();
+            mesh.SetVertices(_vertices, 0, vertexOffset);
+            mesh.SetNormals(_normals, 0, vertexOffset);
+            mesh.SetUVs(0, _texCoords, 0, vertexOffset);
+            mesh.SetIndices(_indices, 0, indexOffset, MeshTopology.Triangles, 0);
+
+            mesh.MarkModified();
+        }
+
+        private void RemoveDisconnectedPolyhedra()
+        {
+            _visitQueue.Clear();
+            _visited.Clear();
+
+            var anchorPos = (float3) (Anchor != null ? Anchor : transform).position;
+
+            foreach (var poly in _polyhedra)
+            {
+                if (poly.Contains(anchorPos))
+                {
+                    _visited.Add(poly);
+                    _visitQueue.Enqueue(poly);
+                    break;
+                }
+            }
+
+            if (_visitQueue.Count == 0) return;
+
+            while (_visitQueue.Count > 0)
+            {
+                _visitQueue.Dequeue().AddNeighbors(_visited, _visitQueue);
+            }
+
+            if (_visited.Count == _polyhedra.Count) return;
+
+            var child = new GameObject("Debris", typeof(Rigidbody), typeof(MeshFilter), typeof(MeshRenderer));
+            var disconnected = new List<ConvexPolyhedron>();
+
+            for (var i = _polyhedra.Count - 1; i >= 0; --i)
+            {
+                var poly = _polyhedra[i];
+
+                if (_visited.Contains(poly)) continue;
+
+                disconnected.Add(poly);
+                _polyhedra.RemoveAt(i);
+
+                var colliderMesh = new Mesh
+                {
+                    hideFlags = HideFlags.DontSave
+                };
+
+                UpdateMesh(colliderMesh, disconnected, disconnected.Count - 1, 1);
+
+                var collider = new GameObject("Collider", typeof(MeshCollider)).GetComponent<MeshCollider>();
+
+                collider.transform.SetParent(child.transform, false);
+                collider.convex = true;
+                collider.sharedMesh = colliderMesh;
+            }
+
+            var mesh = new Mesh
+            {
+                hideFlags = HideFlags.DontSave
+            };
+
+            UpdateMesh(mesh, disconnected);
+
+            child.GetComponent<MeshFilter>().sharedMesh = mesh;
+            child.GetComponent<MeshRenderer>().sharedMaterial = GetComponent<MeshRenderer>().sharedMaterial;
         }
 
         private readonly HashSet<ConvexFace> _excludedFaces = new HashSet<ConvexFace>();
@@ -125,6 +211,11 @@ namespace CsgTest
             for (var polyIndex = _polyhedra.Count - 1; polyIndex >= 0; --polyIndex)
             {
                 var next = _polyhedra[polyIndex];
+
+                if (op == BrushOperator.Replace && next.MaterialIndex == polyhedron.MaterialIndex)
+                {
+                    continue;
+                }
 
                 var allInside = true;
 

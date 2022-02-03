@@ -60,9 +60,7 @@ namespace CsgTest
 
                 var dot = math.dot(plane.Normal, cutPlane.Normal);
 
-                return plane.Offset * dot > cutPlane.Offset - BspSolid.Epsilon * dot
-                    ? FaceCut.ExcludeNone
-                    : FaceCut.ExcludeAll;
+                return cutPlane.Offset < dot * plane.Offset - BspSolid.Epsilon ? FaceCut.ExcludeNone : FaceCut.ExcludeAll;
             }
 
             var cutNormal = math.cross(cutTangent, plane.Normal);
@@ -128,9 +126,9 @@ namespace CsgTest
                         return (false, true);
                     }
 
-                    if (other.Distance * dot < cut.Distance)
+                    if (other.Distance * dot < cut.Distance + BspSolid.Epsilon)
                     {
-                        if (cut.Distance * dot < other.Distance && dot < 0f)
+                        if (dot < 0f && cut.Distance * dot < other.Distance + BspSolid.Epsilon)
                         {
                             return (false, true);
                         }

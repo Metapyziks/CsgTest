@@ -126,6 +126,20 @@ namespace CsgTest
             _vertexMax = max;
         }
 
+        public void AddNeighbors(HashSet<ConvexPolyhedron> visited, Queue<ConvexPolyhedron> queue)
+        {
+            foreach (var face in _faces)
+            {
+                foreach (var subFace in face.SubFaces)
+                {
+                    if (subFace.Neighbor != null && visited.Add(subFace.Neighbor))
+                    {
+                        queue.Enqueue(subFace.Neighbor);
+                    }
+                }
+            }
+        }
+
         public ConvexPolyhedron Clone()
         {
             var copy = new ConvexPolyhedron
@@ -432,6 +446,8 @@ namespace CsgTest
                 {
                     var other = _faces[i];
 
+                    if (plane.Equals(other.Plane)) continue;
+
                     var planeCut = Helpers.GetFaceCut(plane, other.Plane, planeBasis);
 
                     var auxExclusions = faceCuts.GetNewFaceCutExclusions(planeCut);
@@ -446,6 +462,12 @@ namespace CsgTest
             for (var i = _faces.Count - 1; i >= 0; --i)
             {
                 var other = _faces[i];
+
+                if (plane.Equals(other.Plane))
+                {
+                    continue;
+                }
+
                 var otherBasis = other.Plane.GetBasis();
 
                 var planeCut = Helpers.GetFaceCut(plane, other.Plane, planeBasis);
@@ -624,6 +646,21 @@ namespace CsgTest
                     }
                 }
             }
+        }
+
+        public bool Contains(float3 pos)
+        {
+            if (IsEmpty) return false;
+
+            foreach (var face in _faces)
+            {
+                if (math.dot(pos, face.Plane.Normal) < face.Plane.Offset)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         public void DrawGizmos()
