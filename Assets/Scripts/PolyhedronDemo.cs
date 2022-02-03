@@ -97,29 +97,45 @@ namespace CsgTest
                 }
             }
         }
-
-        private void UpdateMesh(Mesh mesh, List<ConvexPolyhedron> polyhedra)
-        {
-            UpdateMesh(mesh, polyhedra, 0, polyhedra.Count);
-        }
-
-        private void UpdateMesh(Mesh mesh, List<ConvexPolyhedron> polyhedra, int offset, int count)
+        
+        private void UpdateMesh(Mesh mesh, ConvexPolyhedron polyhedron)
         {
             var indexOffset = 0;
             var vertexOffset = 0;
 
-            for (var i = offset; i < offset + count; ++i)
+            WritePolyhedron(ref vertexOffset, ref indexOffset, polyhedron);
+
+            mesh.Clear();
+            mesh.SetVertices(_vertices, 0, vertexOffset);
+            mesh.SetNormals(_normals, 0, vertexOffset);
+            mesh.SetUVs(0, _texCoords, 0, vertexOffset);
+            mesh.SetIndices(_indices, 0, indexOffset, MeshTopology.Triangles, 0);
+
+            mesh.MarkModified();
+        }
+
+        private void WritePolyhedron(ref int vertexOffset, ref int indexOffset, ConvexPolyhedron poly)
+        {
+            var (faceCount, vertexCount) = poly.GetMeshInfo();
+
+            Helpers.EnsureCapacity(ref _vertices, vertexOffset + vertexCount);
+            Helpers.EnsureCapacity(ref _normals, vertexOffset + vertexCount);
+            Helpers.EnsureCapacity(ref _texCoords, vertexOffset + vertexCount);
+            Helpers.EnsureCapacity(ref _indices, indexOffset + faceCount * 3);
+
+            poly.WriteMesh(ref vertexOffset, ref indexOffset,
+                _vertices, _normals, _texCoords, _indices);
+        }
+
+        private void UpdateMesh<T>(Mesh mesh, T polyhedra)
+            where T : IEnumerable<ConvexPolyhedron>
+        {
+            var indexOffset = 0;
+            var vertexOffset = 0;
+
+            foreach (var poly in polyhedra)
             {
-                var poly = polyhedra[i];
-                var (faceCount, vertexCount) = poly.GetMeshInfo();
-
-                Helpers.EnsureCapacity(ref _vertices, vertexOffset + vertexCount);
-                Helpers.EnsureCapacity(ref _normals, vertexOffset + vertexCount);
-                Helpers.EnsureCapacity(ref _texCoords, vertexOffset + vertexCount);
-                Helpers.EnsureCapacity(ref _indices, indexOffset + faceCount * 3);
-
-                poly.WriteMesh(ref vertexOffset, ref indexOffset,
-                    _vertices, _normals, _texCoords, _indices);
+                WritePolyhedron(ref vertexOffset, ref indexOffset, poly);
             }
 
             mesh.Clear();
@@ -157,7 +173,6 @@ namespace CsgTest
 
             if (_visited.Count == _polyhedra.Count) return;
 
-            var child = new GameObject("Debris", typeof(Rigidbody), typeof(MeshFilter), typeof(MeshRenderer));
             var disconnected = new List<ConvexPolyhedron>();
 
             for (var i = _polyhedra.Count - 1; i >= 0; --i)
@@ -168,30 +183,54 @@ namespace CsgTest
 
                 disconnected.Add(poly);
                 _polyhedra.RemoveAt(i);
+            }
 
-                var colliderMesh = new Mesh
+            while (disconnected.Count > 0)
+            {
+                _visited.Clear();
+                _visitQueue.Clear();
+
+                var last = disconnected[disconnected.Count - 1];
+
+                _visitQueue.Enqueue(last);
+                _visited.Add(last);
+
+                while (_visitQueue.Count > 0)
+                {
+                    var next = _visitQueue.Dequeue();
+                    disconnected.Remove(next);
+
+                    next.AddNeighbors(_visited, _visitQueue);
+                }
+
+                var child = new GameObject("Debris", typeof(Rigidbody), typeof(MeshFilter), typeof(MeshRenderer));
+
+                foreach (var poly in _visited)
+                {
+                    var colliderMesh = new Mesh
+                    {
+                        hideFlags = HideFlags.DontSave
+                    };
+
+                    UpdateMesh(colliderMesh, poly);
+
+                    var collider = new GameObject("Collider", typeof(MeshCollider)).GetComponent<MeshCollider>();
+
+                    collider.transform.SetParent(child.transform, false);
+                    collider.convex = true;
+                    collider.sharedMesh = colliderMesh;
+                }
+
+                var mesh = new Mesh
                 {
                     hideFlags = HideFlags.DontSave
                 };
 
-                UpdateMesh(colliderMesh, disconnected, disconnected.Count - 1, 1);
+                UpdateMesh(mesh, _visited);
 
-                var collider = new GameObject("Collider", typeof(MeshCollider)).GetComponent<MeshCollider>();
-
-                collider.transform.SetParent(child.transform, false);
-                collider.convex = true;
-                collider.sharedMesh = colliderMesh;
+                child.GetComponent<MeshFilter>().sharedMesh = mesh;
+                child.GetComponent<MeshRenderer>().sharedMaterial = GetComponent<MeshRenderer>().sharedMaterial;
             }
-
-            var mesh = new Mesh
-            {
-                hideFlags = HideFlags.DontSave
-            };
-
-            UpdateMesh(mesh, disconnected);
-
-            child.GetComponent<MeshFilter>().sharedMesh = mesh;
-            child.GetComponent<MeshRenderer>().sharedMaterial = GetComponent<MeshRenderer>().sharedMaterial;
         }
 
         private readonly HashSet<ConvexFace> _excludedFaces = new HashSet<ConvexFace>();
@@ -206,11 +245,20 @@ namespace CsgTest
             var changed = false;
             var maybeOutside = false;
 
+            var min = polyhedron.VertexMin - BspSolid.Epsilon;
+            var max = polyhedron.VertexMax + BspSolid.Epsilon;
+
             _intersections.Clear();
 
             for (var polyIndex = _polyhedra.Count - 1; polyIndex >= 0; --polyIndex)
             {
                 var next = _polyhedra[polyIndex];
+
+                var nextMin = next.VertexMin;
+                var nextMax = next.VertexMax;
+
+                if (nextMin.x > max.x || nextMin.y > max.y || nextMin.z > max.z) continue;
+                if (nextMax.x < min.x || nextMax.y < min.y || nextMax.z < min.z) continue;
 
                 if (op == BrushOperator.Replace && next.MaterialIndex == polyhedron.MaterialIndex)
                 {

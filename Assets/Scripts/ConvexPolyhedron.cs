@@ -111,10 +111,10 @@ namespace CsgTest
                     var b = cut.GetPoint(basis, cut.Max);
 
                     min = math.min(min, a);
-                    max = math.min(max, a);
+                    max = math.max(max, a);
 
                     min = math.min(min, b);
-                    max = math.min(max, b);
+                    max = math.max(max, b);
 
                     avgPos += a + b;
                     posCount += 2;
@@ -518,6 +518,7 @@ namespace CsgTest
 
                 if (!planeExclusions.ExcludesNone)
                 {
+                    _vertexPropertiesInvalid = true;
                     face.FaceCuts.AddFaceCut(planeCut);
                 }
 
