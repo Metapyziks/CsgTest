@@ -10,7 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 567770341}
   - component: {fileID: 567770342}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Spot Light
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -104,7 +104,7 @@ GameObject:
   - component: {fileID: 3885958446156053892}
   - component: {fileID: 3885958446156053894}
   - component: {fileID: 3885958446156053895}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Eyes
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -187,7 +187,7 @@ GameObject:
   m_Component:
   - component: {fileID: 440380019889620299}
   - component: {fileID: 4210023516926329879}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Subtract
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -227,7 +227,7 @@ GameObject:
   - component: {fileID: 1380967429039715679}
   - component: {fileID: 3885958447050738769}
   - component: {fileID: 4943742206079196393}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Player
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -288,6 +288,8 @@ MonoBehaviour:
   GroundFriction: 0.95
   AirFriction: 0.1
   MouseSensitivity: 4
+  FireRate: 5
+  GrenadeThrowSpeed: 25
   FlareThrowSpeed: 8
   Velocity:
     x: 0
@@ -296,4 +298,6 @@ MonoBehaviour:
   IsGrounded: 0
   JumpPressed: 0
   SubtractMesh: {fileID: 0}
+  GrenadePrefab: {fileID: 2432226678720373827, guid: 8898157caa3d79c4bb990f7985d2935b, type: 3}
   FlarePrefab: {fileID: 6408876852777031958, guid: ea5e07fe2e5e8b44e9e354b339fae30e, type: 3}
+  SubtractSize: 2.5

@@ -24,6 +24,10 @@ namespace CsgTest
 
         public float MouseSensitivity = 4f;
 
+        public float FireRate = 10f;
+        public float FireCone = 0.05f;
+
+        public float GrenadeThrowSpeed = 16f;
         public float FlareThrowSpeed = 8f;
 
         public float3 Velocity;
@@ -33,9 +37,12 @@ namespace CsgTest
 
         public MeshFilter SubtractMesh;
 
+        public GameObject GrenadePrefab;
         public GameObject FlarePrefab;
 
         public float SubtractSize = 2.5f;
+
+        private float _lastShotTime;
 
         void Start()
         {
@@ -51,7 +58,30 @@ namespace CsgTest
 
             return result;
         }
-        
+
+        private void FireGrenade()
+        {
+            var nade = Instantiate(GrenadePrefab);
+            nade.transform.position = _eyes.position - Vector3.up * 0.5f + _eyes.right * 0.2f;
+            nade.transform.rotation = _eyes.rotation;
+
+            var rigidBody = nade.GetComponent<Rigidbody>();
+
+            rigidBody.velocity = (_eyes.forward + UnityEngine.Random.insideUnitSphere * FireCone).normalized * GrenadeThrowSpeed;
+        }
+
+        private void ThrowFlare()
+        {
+            var flare = Instantiate(FlarePrefab);
+            flare.transform.position = _eyes.position - Vector3.up * 0.5f + _eyes.right * 0.2f;
+
+            var rigidBody = flare.GetComponent<Rigidbody>();
+
+            rigidBody.velocity = (_eyes.forward + Vector3.up * 0.25f).normalized * FlareThrowSpeed;
+            rigidBody.angularVelocity = new Vector3(UnityEngine.Random.value * 90f - 45f,
+                UnityEngine.Random.value * 90f - 45f, UnityEngine.Random.value * 90f - 45f);
+        }
+
         void Update()
         {
             if (Input.GetKeyDown(KeyCode.Escape))
@@ -70,14 +100,7 @@ namespace CsgTest
 
             if (Input.GetKeyDown(KeyCode.F))
             {
-                var flare = Instantiate(FlarePrefab);
-                flare.transform.position = _eyes.position - Vector3.up * 0.5f;
-
-                var rigidBody = flare.GetComponent<Rigidbody>();
-
-                rigidBody.velocity = (_eyes.forward + Vector3.up * 0.25f).normalized * FlareThrowSpeed;
-                rigidBody.angularVelocity = new Vector3(UnityEngine.Random.value * 90f - 45f,
-                    UnityEngine.Random.value * 90f - 45f, UnityEngine.Random.value * 90f - 45f);
+                ThrowFlare();
             }
 
             if (Cursor.lockState == CursorLockMode.Locked)
@@ -92,9 +115,13 @@ namespace CsgTest
 
                 var ctrlHeld = Input.GetKey(KeyCode.LeftControl);
 
-                if (Input.GetMouseButtonDown(0))
+                if (Input.GetMouseButton(0))
                 {
-                    Subtract();
+                    if (Time.time - _lastShotTime > 1f / FireRate)
+                    {
+                        _lastShotTime = Time.time;
+                        FireGrenade();
+                    }
                 }
                 else if (Input.GetMouseButtonDown(1))
                 {

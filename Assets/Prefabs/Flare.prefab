@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 2776194409916533822}
   - component: {fileID: 6925060061323287435}
   - component: {fileID: 8485414068205464665}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Cylinder (1)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -92,7 +92,7 @@ GameObject:
   - component: {fileID: 3822109644418657859}
   - component: {fileID: 5600418903892361125}
   - component: {fileID: 8964425218123131333}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Cylinder
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -175,7 +175,7 @@ GameObject:
   - component: {fileID: 9097475710486490351}
   - component: {fileID: 1265348827205085066}
   - component: {fileID: 1833146736198307627}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Flare
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -288,7 +288,7 @@ GameObject:
   m_Component:
   - component: {fileID: 3890951557639848784}
   - component: {fileID: 8135705939795987455}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Point Light
   m_TagString: Untagged
   m_Icon: {fileID: 0}
