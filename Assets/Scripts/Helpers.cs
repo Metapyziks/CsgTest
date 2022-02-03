@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Mathematics;
@@ -132,7 +132,7 @@ namespace CsgTest
 
                     if (other.Distance * dot < cut.Distance)
                     {
-                        if (cut.Distance * dot < other.Distance)
+                        if (cut.Distance * dot < other.Distance && dot < 0f)
                         {
                             return (false, true);
                         }
