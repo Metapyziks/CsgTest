@@ -18,6 +18,16 @@ namespace CsgTest
             return new FaceCut(-cut.Normal, -cut.Distance, -cut.Max, -cut.Min);
         }
 
+        public static FaceCut operator +(FaceCut cut, float offset)
+        {
+            return new FaceCut(cut.Normal, cut.Distance + offset, float.NegativeInfinity, float.PositiveInfinity);
+        }
+
+        public static FaceCut operator -(FaceCut cut, float offset)
+        {
+            return new FaceCut(cut.Normal, cut.Distance - offset, float.NegativeInfinity, float.PositiveInfinity);
+        }
+
         public readonly float2 Normal;
         public readonly float Angle;
         public readonly float Distance;

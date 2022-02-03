@@ -10,7 +10,8 @@ namespace CsgTest
     public enum BrushOperator
     {
         Add,
-        Subtract
+        Subtract,
+        Replace
     }
 
     public enum Primitive

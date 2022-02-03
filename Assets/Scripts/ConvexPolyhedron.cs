@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Unity.Mathematics;
 using UnityEngine;
@@ -53,7 +53,7 @@ namespace CsgTest
         public bool IsEmpty { get; private set; }
         public int FaceCount => _faces.Count;
 
-        private bool _vertexAverageInvalid;
+        private bool _vertexAverageInvalid = true;
         private float3 _vertexAverage;
 
         public float3 VertexAverage
@@ -89,6 +89,19 @@ namespace CsgTest
         public ConvexPolyhedron()
         {
             Index = NextIndex++;
+        }
+
+        public ConvexPolyhedron Clone()
+        {
+            var copy = new ConvexPolyhedron
+            {
+                MaterialIndex = MaterialIndex,
+                IsEmpty = IsEmpty
+            };
+
+            copy.CopyFaces(_faces);
+
+            return copy;
         }
 
         public ConvexFace GetFace(int index)
@@ -133,7 +146,7 @@ namespace CsgTest
 
         public void Clear()
         {
-            Removed();
+            Removed(null);
 
             _faces.Clear();
             IsEmpty = false;
@@ -142,20 +155,20 @@ namespace CsgTest
 
         private void SetEmpty()
         {
-            Removed();
+            Removed(null);
 
             _faces.Clear();
             IsEmpty = true;
             _vertexAverageInvalid = true;
         }
 
-        internal void Removed()
+        internal void Removed(ConvexPolyhedron replacement)
         {
             foreach (var face in _faces)
             {
                 foreach (var subFace in face.SubFaces)
                 {
-                    subFace.Neighbor?.ReplaceNeighbor(-face.Plane, this, null);
+                    subFace.Neighbor?.ReplaceNeighbor(-face.Plane, this, replacement);
                 }
             }
         }
@@ -186,11 +199,6 @@ namespace CsgTest
 
         private void AddSubFaceCut(BspPlane plane, ConvexPolyhedron neighbor, ConvexPolyhedron newNeighbor, BspPlane cutPlane)
         {
-            //if (Index == 4 && Math.Abs(plane.Normal.y - (-1f)) < BspSolid.Epsilon)
-            //{
-            //    Debug.Log($"AddSubFaceCut {neighbor} {newNeighbor?.ToString() ?? "null"} {cutPlane}");
-            //}
-
             foreach (var face in _faces)
             {
                 if (!face.Plane.Equals(plane)) continue;
@@ -203,35 +211,44 @@ namespace CsgTest
                     var basis = face.Plane.GetBasis();
                     var faceCut = Helpers.GetFaceCut(face.Plane, cutPlane, basis);
 
-                    var (excludeNone, excludeAll) = subFace.FaceCuts.GetNewFaceCutExclusions(faceCut);
+                    var (excludeNone, _) = AddSubFaceCut(face, ref subFace, faceCut, newNeighbor);
 
-                    if (excludeNone) return;
-                    if (excludeAll)
+                    if (!excludeNone)
                     {
-                        subFace.Neighbor = newNeighbor;
                         face.SubFaces[i] = subFace;
-                        continue;
                     }
-
-                    var newSubFace = new SubFace
-                    {
-                        FaceCuts = new List<FaceCut>(subFace.FaceCuts),
-                        Neighbor = newNeighbor
-                    };
-
-                    subFace.FaceCuts.AddFaceCut(faceCut);
-                    subFace.FaceCuts.Sort(FaceCut.Comparer);
-
-                    newSubFace.FaceCuts.AddFaceCut(-faceCut);
-                    newSubFace.FaceCuts.Sort(FaceCut.Comparer);
-
-                    face.SubFaces.Add(newSubFace);
-                    return;
                 }
             }
         }
 
-        internal void CopyFaces(HashSet<ConvexFace> faces)
+        private (bool ExcludeNone, bool ExcludeAll) AddSubFaceCut(ConvexFace face, ref SubFace subFace, FaceCut faceCut, ConvexPolyhedron newNeighbor)
+        {
+            var (excludeNone, excludeAll) = subFace.FaceCuts.GetNewFaceCutExclusions(faceCut);
+
+            if (excludeNone) return (true, false);
+            if (excludeAll)
+            {
+                subFace.Neighbor = newNeighbor;
+                return (false, true);
+            }
+
+            var newSubFace = new SubFace
+            {
+                FaceCuts = new List<FaceCut>(subFace.FaceCuts),
+                Neighbor = newNeighbor
+            };
+
+            subFace.FaceCuts.AddFaceCut(faceCut);
+            subFace.FaceCuts.Sort(FaceCut.Comparer);
+
+            newSubFace.FaceCuts.AddFaceCut(-faceCut);
+            newSubFace.FaceCuts.Sort(FaceCut.Comparer);
+
+            face.SubFaces.Add(newSubFace);
+            return (false, false);
+        }
+
+        internal void CopyFaces(IEnumerable<ConvexFace> faces)
         {
             _vertexAverageInvalid = true;
 
@@ -256,6 +273,60 @@ namespace CsgTest
                 }
 
                 _faces.Add(copy);
+            }
+        }
+
+        private bool TryGetFace(BspPlane plane, out ConvexFace matchingFace)
+        {
+            foreach (var face in _faces)
+            {
+                if (face.Plane.Equals(plane))
+                {
+                    matchingFace = face;
+                    return true;
+                }
+            }
+
+            matchingFace = default;
+            return false;
+        }
+        
+        internal void CopySubFaces(ConvexPolyhedron other)
+        {
+            foreach (var otherFace in other._faces)
+            {
+                if (!TryGetFace(otherFace.Plane, out var thisFace)) continue;
+
+                foreach (var otherSubFace in otherFace.SubFaces)
+                {
+                    if (otherSubFace.Neighbor == null) continue;
+
+                    for (var i = thisFace.SubFaces.Count - 1; i >= 0; --i)
+                    {
+                        var subFace = thisFace.SubFaces[i];
+                        if (subFace.Neighbor != null) continue;
+
+                        var allInside = true;
+
+                        foreach (var subFaceCut in otherSubFace.FaceCuts)
+                        {
+                            var (excludeNone, excludeAll) = AddSubFaceCut(thisFace, ref subFace,
+                                subFaceCut - BspSolid.Epsilon, null);
+
+                            if (excludeAll)
+                            {
+                                allInside = false;
+                                break;
+                            }
+                        }
+
+                        if (allInside)
+                        {
+                            subFace.Neighbor = otherSubFace.Neighbor;
+                            thisFace.SubFaces[i] = subFace;
+                        }
+                    }
+                }
             }
         }
 

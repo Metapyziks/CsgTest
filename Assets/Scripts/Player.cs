@@ -132,7 +132,7 @@ namespace CsgTest
 
                 mesh.Transform(float4x4.TRS(position, rotation, localScale));
 
-                polyDemo.Subtract(mesh);
+                polyDemo.Combine(mesh, BrushOperator.Subtract);
             }
         }
 

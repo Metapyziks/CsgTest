@@ -39,6 +39,7 @@ namespace CsgTest
             if (_geometryInvalid)
             {
                 _geometryInvalid = false;
+                _meshInvalid = true;
 
                 ConvexPolyhedron.NextIndex = 0;
 
@@ -54,16 +55,7 @@ namespace CsgTest
                     shape.MaterialIndex = brush.MaterialIndex;
                     shape.Transform(matrix);
 
-                    switch (brush.Operator)
-                    {
-                        case BrushOperator.Add:
-                            Add(shape);
-                            break;
-
-                        case BrushOperator.Subtract:
-                            Subtract(shape);
-                            break;
-                    }
+                    Combine(shape, brush.Operator);
                 }
             }
 
@@ -116,24 +108,18 @@ namespace CsgTest
             }
         }
 
-        public bool Add(ConvexPolyhedron polyhedron)
-        {
-            if (polyhedron.IsEmpty) return false;
-
-            Subtract(polyhedron);
-            _polyhedra.Add(polyhedron);
-
-            _meshInvalid = true;
-            return true;
-        }
-
         private readonly HashSet<ConvexFace> _excludedFaces = new HashSet<ConvexFace>();
 
-        public bool Subtract(ConvexPolyhedron polyhedron)
+        private readonly List<ConvexPolyhedron> _intersections =
+            new List<ConvexPolyhedron>();
+
+        public bool Combine(ConvexPolyhedron polyhedron, BrushOperator op)
         {
             if (polyhedron.IsEmpty) return false;
 
             var changed = false;
+
+            _intersections.Clear();
 
             for (var polyIndex = _polyhedra.Count - 1; polyIndex >= 0; --polyIndex)
             {
@@ -197,9 +183,36 @@ namespace CsgTest
 
                 if (!allInside) continue;
 
-                next.Removed();
-                _polyhedra.Remove(next);
+                switch (op)
+                {
+                    case BrushOperator.Replace:
+                        next.MaterialIndex = polyhedron.MaterialIndex;
+                        break;
+
+                    case BrushOperator.Add:
+                        _intersections.Add(next);
+                        _polyhedra.RemoveAt(polyIndex);
+                        break;
+
+                    case BrushOperator.Subtract:
+                        next.Removed(null);
+                        _polyhedra.RemoveAt(polyIndex);
+                        break;
+                }
+
                 changed = true;
+            }
+
+            if (op == BrushOperator.Add)
+            {
+                polyhedron = polyhedron.Clone();
+                _polyhedra.Add(polyhedron);
+
+                foreach (var intersection in _intersections)
+                {
+                    polyhedron.CopySubFaces(intersection);
+                    intersection.Removed(polyhedron);
+                }
             }
 
             _meshInvalid |= changed;
