@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Assertions;
+using Object = UnityEngine.Object;
 
 namespace CsgTest
 {
@@ -51,6 +53,10 @@ namespace CsgTest
         public int MaterialIndex { get; set; }
 
         public bool IsEmpty { get; private set; }
+
+        public MeshCollider Collider { get; set; }
+        public bool ColliderInvalid { get; private set; }
+
         public int FaceCount => _faces.Count;
 
         private bool _vertexPropertiesInvalid = true;
@@ -88,6 +94,12 @@ namespace CsgTest
         public ConvexPolyhedron()
         {
             Index = NextIndex++;
+        }
+
+        public void InvalidateMesh()
+        {
+            _vertexPropertiesInvalid = true;
+            ColliderInvalid = true;
         }
 
         private void UpdateVertexProperties()
@@ -140,6 +152,78 @@ namespace CsgTest
             }
         }
 
+        [ThreadStatic]
+        private static Vector3[] _sPhysicsMeshVertices;
+
+        [ThreadStatic]
+        private static ushort[] _sPhysicsMeshIndices;
+
+        public void UpdateCollider(PolyhedronDemo parent)
+        {
+            ColliderInvalid = false;
+
+            if (Collider == null)
+            {
+                Collider = new GameObject("Collider", typeof(MeshCollider)).GetComponent<MeshCollider>();
+                Collider.convex = true;
+                Collider.sharedMesh = new Mesh
+                {
+                    hideFlags = HideFlags.DontSave
+                };
+            }
+            
+            if (Collider.transform.parent != parent.transform)
+            {
+                Collider.transform.SetParent(parent.transform, false);
+            }
+
+            var vertexCount = _faces.Where(x => x.FaceCuts.Count >= 3).Sum(x => x.FaceCuts.Count);
+            var indexCount = _faces.Where(x => x.FaceCuts.Count >= 3).Sum(x => x.FaceCuts.Count - 2) * 3;
+
+            Helpers.EnsureCapacity(ref _sPhysicsMeshVertices, vertexCount);
+            Helpers.EnsureCapacity(ref _sPhysicsMeshIndices, indexCount);
+
+            var vertices = _sPhysicsMeshVertices;
+            var indices = _sPhysicsMeshIndices;
+
+            var vertexOffset = 0;
+            var indexOffset = 0;
+
+            foreach (var face in _faces)
+            {
+                if (face.FaceCuts.Count < 3) continue;
+
+                var firstIndex = (ushort)vertexOffset;
+                var basis = face.Plane.GetBasis();
+
+                foreach (var cut in face.FaceCuts)
+                {
+                    var vertex = cut.GetPoint(basis, cut.Max);
+
+                    vertices[vertexOffset] = vertex;
+
+                    ++vertexOffset;
+                }
+
+                for (var i = 2; i < face.FaceCuts.Count; ++i)
+                {
+                    indices[indexOffset++] = firstIndex;
+                    indices[indexOffset++] = (ushort)(firstIndex + i - 1);
+                    indices[indexOffset++] = (ushort)(firstIndex + i);
+                }
+            }
+
+            var mesh = Collider.sharedMesh;
+
+            mesh.Clear();
+            mesh.SetVertices(vertices, 0, vertexOffset);
+            mesh.SetIndices(indices, 0, indexOffset, MeshTopology.Triangles, 0);
+
+            mesh.MarkModified();
+
+            Collider.sharedMesh = mesh;
+        }
+
         public ConvexPolyhedron Clone()
         {
             var copy = new ConvexPolyhedron
@@ -160,7 +244,7 @@ namespace CsgTest
         
         public void Transform(in float4x4 matrix)
         {
-            _vertexPropertiesInvalid = true;
+            InvalidateMesh();
 
             for (var i = 0; i < _faces.Count; ++i)
             {
@@ -193,22 +277,14 @@ namespace CsgTest
             }
         }
 
-        public void Clear()
-        {
-            Removed(null);
-
-            _faces.Clear();
-            IsEmpty = false;
-            _vertexPropertiesInvalid = true;
-        }
-
         private void SetEmpty()
         {
             Removed(null);
 
             _faces.Clear();
             IsEmpty = true;
-            _vertexPropertiesInvalid = true;
+
+            InvalidateMesh();
         }
 
         internal void Removed(ConvexPolyhedron replacement)
@@ -219,6 +295,12 @@ namespace CsgTest
                 {
                     subFace.Neighbor?.ReplaceNeighbor(-face.Plane, this, replacement);
                 }
+            }
+
+            if (Collider != null)
+            {
+                Object.Destroy(Collider.gameObject);
+                Collider = null;
             }
         }
 
@@ -302,7 +384,7 @@ namespace CsgTest
 
         internal void CopyFaces(IEnumerable<ConvexFace> faces)
         {
-            _vertexPropertiesInvalid = true;
+            InvalidateMesh();
 
             foreach (var face in faces)
             {
@@ -428,7 +510,8 @@ namespace CsgTest
                     };
 
                     _faces.Add(face);
-                    _vertexPropertiesInvalid = true;
+
+                    InvalidateMesh();
                 }
 
                 return (false, false);
@@ -509,7 +592,6 @@ namespace CsgTest
                         }
 
                         _faces.RemoveAt(i);
-                        _vertexPropertiesInvalid = true;
                     }
 
                     --remainingFacesCount;
@@ -518,14 +600,11 @@ namespace CsgTest
 
                 if (!planeExclusions.ExcludesNone)
                 {
-                    _vertexPropertiesInvalid = true;
                     face.FaceCuts.AddFaceCut(planeCut);
                 }
 
                 if (!otherExclusions.ExcludesNone && !dryRun)
                 {
-                    _vertexPropertiesInvalid = true;
-
                     other.FaceCuts.AddFaceCut(otherCut);
                     other.FaceCuts.Sort(FaceCut.Comparer);
 
@@ -583,7 +662,7 @@ namespace CsgTest
                 };
 
                 _faces.Add(face);
-                _vertexPropertiesInvalid = true;
+                InvalidateMesh();
             }
 
             return (false, false);

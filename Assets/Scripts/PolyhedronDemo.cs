@@ -25,11 +25,14 @@ namespace CsgTest
         private ushort[] _indices;
         private Mesh _mesh;
 
+        private bool _hasRigidBody;
+
         public Transform Anchor;
 
         void Start()
         {
-            _geometryInvalid = true;
+            _hasRigidBody = GetComponent<Rigidbody>() != null;
+            _geometryInvalid = _polyhedra.Count == 0;
         }
 
         void Update()
@@ -72,6 +75,12 @@ namespace CsgTest
                 if (UnityEditor.EditorApplication.isPlaying)
 #endif
                 {
+                    if (_polyhedra.Count == 0)
+                    {
+                        Destroy(gameObject);
+                        return;
+                    }
+
                     RemoveDisconnectedPolyhedra();
                 }
 
@@ -97,22 +106,6 @@ namespace CsgTest
                 }
             }
         }
-        
-        private void UpdateMesh(Mesh mesh, ConvexPolyhedron polyhedron)
-        {
-            var indexOffset = 0;
-            var vertexOffset = 0;
-
-            WritePolyhedron(ref vertexOffset, ref indexOffset, polyhedron);
-
-            mesh.Clear();
-            mesh.SetVertices(_vertices, 0, vertexOffset);
-            mesh.SetNormals(_normals, 0, vertexOffset);
-            mesh.SetUVs(0, _texCoords, 0, vertexOffset);
-            mesh.SetIndices(_indices, 0, indexOffset, MeshTopology.Triangles, 0);
-
-            mesh.MarkModified();
-        }
 
         private void WritePolyhedron(ref int vertexOffset, ref int indexOffset, ConvexPolyhedron poly)
         {
@@ -123,8 +116,16 @@ namespace CsgTest
             Helpers.EnsureCapacity(ref _texCoords, vertexOffset + vertexCount);
             Helpers.EnsureCapacity(ref _indices, indexOffset + faceCount * 3);
 
+            var oldVertexOffset = vertexOffset;
+            var oldIndexOffset = indexOffset;
+
             poly.WriteMesh(ref vertexOffset, ref indexOffset,
                 _vertices, _normals, _texCoords, _indices);
+
+            if (_hasRigidBody && poly.ColliderInvalid)
+            {
+                poly.UpdateCollider(this);
+            }
         }
 
         private void UpdateMesh<T>(Mesh mesh, T polyhedra)
@@ -149,22 +150,29 @@ namespace CsgTest
 
         private void RemoveDisconnectedPolyhedra()
         {
+            if (_polyhedra.Count == 0) return;
+
             _visitQueue.Clear();
             _visited.Clear();
 
-            var anchorPos = (float3) (Anchor != null ? Anchor : transform).position;
-
-            foreach (var poly in _polyhedra)
+            if (Anchor != null)
             {
-                if (poly.Contains(anchorPos))
-                {
-                    _visited.Add(poly);
-                    _visitQueue.Enqueue(poly);
-                    break;
-                }
-            }
+                var anchorPos = (float3) Anchor.position;
+                var match = _polyhedra.FirstOrDefault(x => x.Contains(anchorPos));
 
-            if (_visitQueue.Count == 0) return;
+                if (match == null)
+                {
+                    return;
+                }
+
+                _visited.Add(match);
+                _visitQueue.Enqueue(match);
+            }
+            else
+            {
+                _visited.Add(_polyhedra[0]);
+                _visitQueue.Enqueue(_polyhedra[0]);
+            }
 
             while (_visitQueue.Count > 0)
             {
@@ -200,36 +208,28 @@ namespace CsgTest
                     var next = _visitQueue.Dequeue();
                     disconnected.Remove(next);
 
+                    next.InvalidateMesh();
                     next.AddNeighbors(_visited, _visitQueue);
                 }
 
-                var child = new GameObject("Debris", typeof(Rigidbody), typeof(MeshFilter), typeof(MeshRenderer));
-
-                foreach (var poly in _visited)
+                var child = new GameObject("Debris", typeof(Rigidbody), typeof(MeshFilter), typeof(MeshRenderer),
+                    typeof(PolyhedronDemo))
                 {
-                    var colliderMesh = new Mesh
+                    transform =
                     {
-                        hideFlags = HideFlags.DontSave
-                    };
+                        localPosition = transform.localPosition,
+                        localRotation = transform.localRotation,
+                        localScale = transform.localScale
+                    }
+                }.GetComponent<PolyhedronDemo>();
 
-                    UpdateMesh(colliderMesh, poly);
-
-                    var collider = new GameObject("Collider", typeof(MeshCollider)).GetComponent<MeshCollider>();
-
-                    collider.transform.SetParent(child.transform, false);
-                    collider.convex = true;
-                    collider.sharedMesh = colliderMesh;
-                }
-
-                var mesh = new Mesh
-                {
-                    hideFlags = HideFlags.DontSave
-                };
-
-                UpdateMesh(mesh, _visited);
-
-                child.GetComponent<MeshFilter>().sharedMesh = mesh;
                 child.GetComponent<MeshRenderer>().sharedMaterial = GetComponent<MeshRenderer>().sharedMaterial;
+
+                child._polyhedra.AddRange(_visited);
+                child._meshInvalid = true;
+
+                child.Start();
+                child.Update();
             }
         }
 

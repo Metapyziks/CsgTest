@@ -126,15 +126,18 @@ namespace CsgTest
             }
 
             var polyDemo = hitInfo.transform.GetComponent<PolyhedronDemo>();
+
             if (polyDemo != null)
             {
+                var worldToLocal = polyDemo.transform.worldToLocalMatrix;
+
                 var mesh = ConvexPolyhedron.CreateDodecahedron(float3.zero, 0.5f);
                 mesh.MaterialIndex = 1;
-                mesh.Transform(float4x4.TRS(position, rotation, localScale * 1.1f));
+                mesh.Transform(math.mul(worldToLocal, float4x4.TRS(position, rotation, localScale * 1.1f)));
                 polyDemo.Combine(mesh, BrushOperator.Replace);
 
                 mesh = ConvexPolyhedron.CreateDodecahedron(float3.zero, 0.5f);
-                mesh.Transform(float4x4.TRS(position, rotation, localScale));
+                mesh.Transform(math.mul(worldToLocal, float4x4.TRS(position, rotation, localScale)));
                 polyDemo.Combine(mesh, BrushOperator.Subtract);
             }
         }
