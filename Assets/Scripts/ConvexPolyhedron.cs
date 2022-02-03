@@ -223,6 +223,9 @@ namespace CsgTest
 
         private (bool ExcludeNone, bool ExcludeAll) AddSubFaceCut(ConvexFace face, ref SubFace subFace, FaceCut faceCut, ConvexPolyhedron newNeighbor)
         {
+            faceCut.Min = float.NegativeInfinity;
+            faceCut.Max = float.PositiveInfinity;
+
             var (excludeNone, excludeAll) = subFace.FaceCuts.GetNewFaceCutExclusions(faceCut);
 
             if (excludeNone) return (true, false);
