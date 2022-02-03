@@ -268,8 +268,6 @@ namespace CsgTest
                         Neighbor = subFace.Neighbor,
                         FaceCuts = new List<FaceCut>(subFace.FaceCuts)
                     });
-
-                    // subFace.Neighbor?.AddNeighbor(-face.Plane, this, subFace.FaceCuts);
                 }
 
                 _faces.Add(copy);
@@ -295,7 +293,10 @@ namespace CsgTest
         {
             foreach (var otherFace in other._faces)
             {
-                if (!TryGetFace(otherFace.Plane, out var thisFace)) continue;
+                if (!TryGetFace(otherFace.Plane, out var thisFace))
+                {
+                    continue;
+                }
 
                 foreach (var otherSubFace in otherFace.SubFaces)
                 {
@@ -310,8 +311,13 @@ namespace CsgTest
 
                         foreach (var subFaceCut in otherSubFace.FaceCuts)
                         {
+                            if (thisFace.FaceCuts.Contains(subFaceCut, BspSolid.Epsilon * 8f))
+                            {
+                                continue;
+                            }
+
                             var (excludeNone, excludeAll) = AddSubFaceCut(thisFace, ref subFace,
-                                subFaceCut - BspSolid.Epsilon, null);
+                                subFaceCut, null);
 
                             if (excludeAll)
                             {
@@ -590,15 +596,7 @@ namespace CsgTest
         {
             foreach (var face in _faces)
             {
-                var basis = face.Plane.GetBasis();
-
-                foreach (var cut in face.FaceCuts)
-                {
-                    var min = cut.GetPoint(basis, cut.Min);
-                    var max = cut.GetPoint(basis, cut.Max);
-
-                    Gizmos.DrawLine(min, max);
-                }
+                face.DrawGizmos();
             }
 
 #if UNITY_EDITOR
@@ -616,6 +614,16 @@ namespace CsgTest
     {
         public ConvexPolyhedron Neighbor;
         public List<FaceCut> FaceCuts;
+
+        public void DrawDebug(BspPlane plane, Color color)
+        {
+            var basis = plane.GetBasis();
+
+            foreach (var cut in FaceCuts)
+            {
+                cut.DrawDebug(basis, color);
+            }
+        }
     }
 
     public struct ConvexFace : IEquatable<ConvexFace>
@@ -642,6 +650,29 @@ namespace CsgTest
         public override int GetHashCode()
         {
             return Plane.GetHashCode();
+        }
+
+        public void DrawGizmos()
+        {
+            var basis = Plane.GetBasis();
+
+            foreach (var cut in FaceCuts)
+            {
+                var min = cut.GetPoint(basis, cut.Min);
+                var max = cut.GetPoint(basis, cut.Max);
+
+                Gizmos.DrawLine(min, max);
+            }
+        }
+
+        public void DrawDebug(Color color)
+        {
+            var basis = Plane.GetBasis();
+
+            foreach (var cut in FaceCuts)
+            {
+                cut.DrawDebug(basis, color);
+            }
         }
     }
 }

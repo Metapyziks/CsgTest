@@ -1,5 +1,6 @@
 ﻿using System;
 using Unity.Mathematics;
+using UnityEngine;
 
 namespace CsgTest
 {
@@ -121,6 +122,22 @@ namespace CsgTest
             return new FaceCut(normal, math.dot(normal, midPos2),
                 math.min(min, max), math.max(min, max));
         }
-    }
 
+        public void DrawDebug(BspPlane plane, Color color)
+        {
+            DrawDebug(plane.GetBasis(), color);
+        }
+
+        public void DrawDebug(in (float3 origin, float3 tu, float3 tv) basis, Color color)
+        {
+            var min = GetPoint(basis, Min);
+            var max = GetPoint(basis, Max);
+
+            var mid = (min + max) * 0.5f;
+            var norm = Normal.x * basis.tu + Normal.y * basis.tv;
+
+            Debug.DrawLine(min, max, color);
+            Debug.DrawLine(mid, mid + norm, color);
+        }
+    }
 }

@@ -81,6 +81,20 @@ namespace CsgTest
             return new FaceCut(cutNormal2, t + bias, float.NegativeInfinity, float.PositiveInfinity);
         }
 
+        public static bool Contains(this List<FaceCut> faceCuts, FaceCut faceCut, float epsilon)
+        {
+            foreach (var cut in faceCuts)
+            {
+                if (math.abs(cut.Normal.x - faceCut.Normal.x) > epsilon) continue;
+                if (math.abs(cut.Normal.y - faceCut.Normal.y) > epsilon) continue;
+                if (math.abs(cut.Distance - faceCut.Distance) > epsilon) continue;
+
+                return true;
+            }
+
+            return false;
+        }
+
         public static (bool ExcludesNone, bool ExcludesAll) GetNewFaceCutExclusions(this List<FaceCut> faceCuts, FaceCut cut)
         {
             if (cut.ExcludesAll)
