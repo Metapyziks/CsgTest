@@ -53,42 +53,77 @@ namespace CsgTest
         public bool IsEmpty { get; private set; }
         public int FaceCount => _faces.Count;
 
-        private bool _vertexAverageInvalid = true;
+        private bool _vertexPropertiesInvalid = true;
         private float3 _vertexAverage;
+        private float3 _vertexMin;
+        private float3 _vertexMax;
 
-        public float3 VertexAverage
+        public float3 VertexAverage 
         {
             get
             {
-                if (!_vertexAverageInvalid) return _vertexAverage;
-                if (IsEmpty || _faces.Count == 0) return float3.zero;
+                UpdateVertexProperties();
+                return _vertexAverage;
+            }
+        }
 
-                _vertexAverageInvalid = false;
+        public float3 VertexMin
+        {
+            get
+            {
+                UpdateVertexProperties();
+                return _vertexMin;
+            }
+        }
 
-                var avgPos = float3.zero;
-                var posCount = 0;
-
-                foreach (var face in _faces)
-                {
-                    var basis = face.Plane.GetBasis();
-
-                    foreach (var cut in face.FaceCuts)
-                    {
-                        var min = cut.GetPoint(basis, cut.Min);
-                        var max = cut.GetPoint(basis, cut.Max);
-
-                        avgPos += min + max;
-                        posCount += 2;
-                    }
-                }
-
-                return _vertexAverage = avgPos / posCount;
+        public float3 VertexMax
+        {
+            get
+            {
+                UpdateVertexProperties();
+                return _vertexMax;
             }
         }
 
         public ConvexPolyhedron()
         {
             Index = NextIndex++;
+        }
+
+        private void UpdateVertexProperties()
+        {
+            if (!_vertexPropertiesInvalid) return;
+
+            _vertexPropertiesInvalid = false;
+
+            var min = new float3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
+            var max = new float3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
+            var avgPos = float3.zero;
+            var posCount = 0;
+
+            foreach (var face in _faces)
+            {
+                var basis = face.Plane.GetBasis();
+
+                foreach (var cut in face.FaceCuts)
+                {
+                    var a = cut.GetPoint(basis, cut.Min);
+                    var b = cut.GetPoint(basis, cut.Max);
+
+                    min = math.min(min, a);
+                    max = math.min(max, a);
+
+                    min = math.min(min, b);
+                    max = math.min(max, b);
+
+                    avgPos += a + b;
+                    posCount += 2;
+                }
+            }
+
+            _vertexAverage = posCount == 0 ? float3.zero : avgPos / posCount;
+            _vertexMin = min;
+            _vertexMax = max;
         }
 
         public ConvexPolyhedron Clone()
@@ -111,7 +146,7 @@ namespace CsgTest
         
         public void Transform(in float4x4 matrix)
         {
-            _vertexAverageInvalid = true;
+            _vertexPropertiesInvalid = true;
 
             for (var i = 0; i < _faces.Count; ++i)
             {
@@ -150,7 +185,7 @@ namespace CsgTest
 
             _faces.Clear();
             IsEmpty = false;
-            _vertexAverageInvalid = true;
+            _vertexPropertiesInvalid = true;
         }
 
         private void SetEmpty()
@@ -159,7 +194,7 @@ namespace CsgTest
 
             _faces.Clear();
             IsEmpty = true;
-            _vertexAverageInvalid = true;
+            _vertexPropertiesInvalid = true;
         }
 
         internal void Removed(ConvexPolyhedron replacement)
@@ -253,7 +288,7 @@ namespace CsgTest
 
         internal void CopyFaces(IEnumerable<ConvexFace> faces)
         {
-            _vertexAverageInvalid = true;
+            _vertexPropertiesInvalid = true;
 
             foreach (var face in faces)
             {
@@ -379,7 +414,7 @@ namespace CsgTest
                     };
 
                     _faces.Add(face);
-                    _vertexAverageInvalid = true;
+                    _vertexPropertiesInvalid = true;
                 }
 
                 return (false, false);
@@ -397,16 +432,12 @@ namespace CsgTest
                 {
                     var other = _faces[i];
 
-                    var planeCut = Helpers.GetFaceCut(plane, other.Plane, planeBasis, BspSolid.Epsilon * 10f);
+                    var planeCut = Helpers.GetFaceCut(plane, other.Plane, planeBasis);
 
                     var auxExclusions = faceCuts.GetNewFaceCutExclusions(planeCut);
 
                     if (auxExclusions.ExcludesAll)
                     {
-                        //var middle = tempCuts.DebugDraw(planeBasis, Color.red);
-                        //Debug.DrawLine(middle, middle + other.Plane.Normal);
-                        //Debug.DrawLine(middle, other.Plane.Normal * other.Plane.Offset);
-
                         return (true, true);
                     }
                 }
@@ -456,7 +487,7 @@ namespace CsgTest
                         }
 
                         _faces.RemoveAt(i);
-                        _vertexAverageInvalid = true;
+                        _vertexPropertiesInvalid = true;
                     }
 
                     --remainingFacesCount;
@@ -470,7 +501,7 @@ namespace CsgTest
 
                 if (!otherExclusions.ExcludesNone && !dryRun)
                 {
-                    _vertexAverageInvalid = true;
+                    _vertexPropertiesInvalid = true;
 
                     other.FaceCuts.AddFaceCut(otherCut);
                     other.FaceCuts.Sort(FaceCut.Comparer);
@@ -529,7 +560,7 @@ namespace CsgTest
                 };
 
                 _faces.Add(face);
-                _vertexAverageInvalid = true;
+                _vertexPropertiesInvalid = true;
             }
 
             return (false, false);
@@ -605,6 +636,14 @@ namespace CsgTest
 #if UNITY_EDITOR
             UnityEditor.Handles.Label(VertexAverage, ToString());
 #endif
+        }
+
+        public void DrawDebug(Color color)
+        {
+            foreach (var face in _faces)
+            {
+                face.DrawDebug(color);
+            }
         }
 
         public override string ToString()

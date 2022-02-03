@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Mathematics;
@@ -50,7 +50,7 @@ namespace CsgTest
             return (origin, tu, tv);
         }
 
-        public static FaceCut GetFaceCut(BspPlane plane, BspPlane cutPlane, in (float3 origin, float3 tu, float3 tv) basis, float bias = 0f)
+        public static FaceCut GetFaceCut(BspPlane plane, BspPlane cutPlane, in (float3 origin, float3 tu, float3 tv) basis)
         {
             var cutTangent = math.cross(plane.Normal, cutPlane.Normal);
 
@@ -60,7 +60,7 @@ namespace CsgTest
 
                 var dot = math.dot(plane.Normal, cutPlane.Normal);
 
-                return plane.Offset * dot > cutPlane.Offset + BspSolid.Epsilon * dot
+                return plane.Offset * dot > cutPlane.Offset - BspSolid.Epsilon * dot
                     ? FaceCut.ExcludeNone
                     : FaceCut.ExcludeAll;
             }
@@ -78,7 +78,7 @@ namespace CsgTest
             var t = math.dot(cutPlane.Normal * cutPlane.Offset - basis.origin, cutPlane.Normal)
                     / math.dot(cutPlane.Normal, cutNormal);
 
-            return new FaceCut(cutNormal2, t + bias, float.NegativeInfinity, float.PositiveInfinity);
+            return new FaceCut(cutNormal2, t, float.NegativeInfinity, float.PositiveInfinity);
         }
 
         public static bool Contains(this List<FaceCut> faceCuts, FaceCut faceCut, float epsilon)
@@ -113,8 +113,6 @@ namespace CsgTest
 
             foreach (var other in faceCuts)
             {
-                if (other.Equals(cut)) return (true, false);
-
                 var cross = Helpers.Cross(cut.Normal, other.Normal);
                 var dot = math.dot(cut.Normal, other.Normal);
 
@@ -240,7 +238,7 @@ namespace CsgTest
             return true;
         }
 
-        public static float3 DebugDraw(this List<FaceCut> faceCuts, in (float3 origin, float3 tu, float3 tv) basis, Color color)
+        public static float3 DrawDebug(this List<FaceCut> faceCuts, in (float3 origin, float3 tu, float3 tv) basis, Color color)
         {
             var avg = float3.zero;
             var pointCount = 0;

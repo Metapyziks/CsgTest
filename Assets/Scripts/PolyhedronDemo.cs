@@ -118,6 +118,7 @@ namespace CsgTest
             if (polyhedron.IsEmpty) return false;
 
             var changed = false;
+            var maybeOutside = false;
 
             _intersections.Clear();
 
@@ -137,6 +138,7 @@ namespace CsgTest
 
                     if (excludedNone)
                     {
+                        maybeOutside |= excludedAll;
                         continue;
                     }
 
@@ -168,16 +170,17 @@ namespace CsgTest
                     changed = true;
                 }
 
-                if (!allInside) continue;
-
-                for (var faceIndex = 0; faceIndex < polyhedron.FaceCount; ++faceIndex)
+                if (allInside && maybeOutside)
                 {
-                    var face = polyhedron.GetFace(faceIndex);
-
-                    if (math.dot(face.Plane.Normal, next.VertexAverage) <= face.Plane.Offset)
+                    for (var faceIndex = 0; faceIndex < polyhedron.FaceCount; ++faceIndex)
                     {
-                        allInside = false;
-                        break;
+                        var face = polyhedron.GetFace(faceIndex);
+
+                        if (math.dot(face.Plane.Normal, next.VertexAverage) <= face.Plane.Offset)
+                        {
+                            allInside = false;
+                            break;
+                        }
                     }
                 }
 

@@ -129,9 +129,7 @@ namespace CsgTest
             if (polyDemo != null)
             {
                 var mesh = ConvexPolyhedron.CreateDodecahedron(float3.zero, 0.5f);
-
                 mesh.Transform(float4x4.TRS(position, rotation, localScale));
-
                 polyDemo.Combine(mesh, BrushOperator.Subtract);
             }
         }
