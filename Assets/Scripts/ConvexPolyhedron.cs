@@ -63,6 +63,7 @@ namespace CsgTest
         private float3 _vertexAverage;
         private float3 _vertexMin;
         private float3 _vertexMax;
+        private float _volume;
 
         public float3 VertexAverage 
         {
@@ -91,6 +92,15 @@ namespace CsgTest
             }
         }
 
+        public float Volume
+        {
+            get
+            {
+                UpdateVertexProperties();
+                return _volume;
+            }
+        }
+
         public ConvexPolyhedron()
         {
             Index = NextIndex++;
@@ -107,6 +117,15 @@ namespace CsgTest
             if (!_vertexPropertiesInvalid) return;
 
             _vertexPropertiesInvalid = false;
+
+            if (IsEmpty)
+            {
+                _vertexAverage = float3.zero;
+                _vertexMin = float3.zero;
+                _vertexMax = float3.zero;
+                _volume = 0f;
+                return;
+            }
 
             var min = new float3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
             var max = new float3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
@@ -136,6 +155,29 @@ namespace CsgTest
             _vertexAverage = posCount == 0 ? float3.zero : avgPos / posCount;
             _vertexMin = min;
             _vertexMax = max;
+
+            var volume = 0f;
+
+            foreach (var face in _faces)
+            {
+                if (face.FaceCuts.Count < 3) continue;
+
+                var basis = face.Plane.GetBasis();
+
+                var a = face.FaceCuts[0].GetPoint(basis, face.FaceCuts[0].Max) - _vertexAverage;
+                var b = face.FaceCuts[1].GetPoint(basis, face.FaceCuts[1].Max) - _vertexAverage;
+
+                for (var i = 2; i < face.FaceCuts.Count; ++i)
+                {
+                    var c = face.FaceCuts[i].GetPoint(basis, face.FaceCuts[i].Max) - _vertexAverage;
+
+                    volume += math.length(math.dot(a, math.cross(b, c)));
+
+                    b = c;
+                }
+            }
+
+            _volume = volume / 6f;
         }
 
         public void AddNeighbors(HashSet<ConvexPolyhedron> visited, Queue<ConvexPolyhedron> queue)

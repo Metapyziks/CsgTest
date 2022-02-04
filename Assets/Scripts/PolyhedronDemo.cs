@@ -116,9 +116,6 @@ namespace CsgTest
             Helpers.EnsureCapacity(ref _texCoords, vertexOffset + vertexCount);
             Helpers.EnsureCapacity(ref _indices, indexOffset + faceCount * 3);
 
-            var oldVertexOffset = vertexOffset;
-            var oldIndexOffset = indexOffset;
-
             poly.WriteMesh(ref vertexOffset, ref indexOffset,
                 _vertices, _normals, _texCoords, _indices);
 
@@ -134,9 +131,16 @@ namespace CsgTest
             var indexOffset = 0;
             var vertexOffset = 0;
 
+            var mass = 0f;
+
+            // TODO: can have different densities for different materials
+            const float density = 1f;
+
             foreach (var poly in polyhedra)
             {
                 WritePolyhedron(ref vertexOffset, ref indexOffset, poly);
+
+                mass += poly.Volume * density;
             }
 
             mesh.Clear();
@@ -146,6 +150,11 @@ namespace CsgTest
             mesh.SetIndices(_indices, 0, indexOffset, MeshTopology.Triangles, 0);
 
             mesh.MarkModified();
+
+            if (_hasRigidBody)
+            {
+                GetComponent<Rigidbody>().mass = mass;
+            }
         }
 
         private void RemoveDisconnectedPolyhedra()
