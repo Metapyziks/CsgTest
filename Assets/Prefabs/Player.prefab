@@ -288,7 +288,8 @@ MonoBehaviour:
   GroundFriction: 0.95
   AirFriction: 0.1
   MouseSensitivity: 4
-  FireRate: 5
+  FireRate: 10
+  FireCone: 0.05
   GrenadeThrowSpeed: 25
   FlareThrowSpeed: 8
   Velocity:
