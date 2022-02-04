@@ -371,6 +371,10 @@ namespace CsgTest
         {
             Gizmos.matrix = transform.localToWorldMatrix;
 
+#if UNITY_EDITOR
+            UnityEditor.Handles.matrix = transform.localToWorldMatrix;
+#endif
+
             foreach (var poly in _polyhedra)
             {
                 poly.DrawGizmos();
