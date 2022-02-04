@@ -306,7 +306,7 @@ namespace CsgTest
                     {
                         MaterialIndex = next.MaterialIndex
                     };
-
+                    
                     child.CopyFaces(_excludedFaces);
 
                     next.Clip(face.Plane, null, child);
@@ -318,7 +318,8 @@ namespace CsgTest
                     }
                     else
                     {
-                        next.ReplaceNeighbor(face.Plane, child, null);
+                        Debug.LogError("Empty child!");
+                        child.Removed(null);
                     }
 
                     changed = true;

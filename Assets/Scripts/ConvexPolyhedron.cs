@@ -348,11 +348,6 @@ namespace CsgTest
 
         internal void ReplaceNeighbor(BspPlane plane, ConvexPolyhedron neighbor, ConvexPolyhedron newNeighbor)
         {
-            //if (Index == 4 && Math.Abs(plane.Normal.y - (-1f)) < BspSolid.Epsilon)
-            //{
-            //    Debug.Log($"Replace {neighbor} {newNeighbor?.ToString() ?? "null"}");
-            //}
-
             foreach (var face in _faces)
             {
                 if (!face.Plane.Equals(plane)) continue;

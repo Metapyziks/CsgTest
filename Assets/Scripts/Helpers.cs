@@ -137,7 +137,7 @@ namespace CsgTest
                         ++excludedCutCount;
                     }
 
-                    if (cut.Distance * dot < other.Distance)
+                    if (cut.Distance * dot < other.Distance + BspSolid.Epsilon)
                     {
                         return (true, false);
                     }
