@@ -11,7 +11,8 @@ namespace CsgTest
     {
         Add,
         Subtract,
-        Replace
+        Replace,
+        Paint
     }
 
     public enum Primitive

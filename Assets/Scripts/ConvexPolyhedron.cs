@@ -352,6 +352,46 @@ namespace CsgTest
             }
         }
 
+        public void PaintMaterial(ConvexPolyhedron poly)
+        {
+            foreach (var face in _faces)
+            {
+                var basis = face.Plane.GetBasis();
+
+                for (var i = face.SubFaces.Count - 1; i >= 0; --i)
+                {
+                    var subFace = face.SubFaces[i];
+                    if (subFace.Neighbor != null) continue;
+
+                    var oldMaterialIndex = subFace.MaterialIndex ?? MaterialIndex;
+                    if (oldMaterialIndex == poly.MaterialIndex) continue;
+
+                    var allInside = true;
+
+                    foreach (var otherFace in poly._faces)
+                    {
+                        var cutPlane = otherFace.Plane;
+
+                        var faceCut = Helpers.GetFaceCut(face.Plane, cutPlane, basis);
+
+                        var (_, excludeAll) = AddSubFaceCut(face, ref subFace, faceCut, null);
+
+                        if (excludeAll)
+                        {
+                            allInside = false;
+                            break;
+                        }
+                    }
+
+                    if (allInside)
+                    {
+                        subFace.MaterialIndex = poly.MaterialIndex;
+                        face.SubFaces[i] = subFace;
+                    }
+                }
+            }
+        }
+
         private (bool ExcludeNone, bool ExcludeAll) AddSubFaceCut(ConvexFace face, ref SubFace subFace, FaceCut faceCut, ConvexPolyhedron newNeighbor)
         {
             faceCut.Min = float.NegativeInfinity;
@@ -400,7 +440,8 @@ namespace CsgTest
                     copy.SubFaces.Add(new SubFace
                     {
                         Neighbor = subFace.Neighbor,
-                        FaceCuts = new List<FaceCut>(subFace.FaceCuts)
+                        FaceCuts = new List<FaceCut>(subFace.FaceCuts),
+                        MaterialIndex = subFace.MaterialIndex
                     });
                 }
 
@@ -463,6 +504,7 @@ namespace CsgTest
                         if (allInside)
                         {
                             subFace.Neighbor = otherSubFace.Neighbor;
+                            subFace.MaterialIndex = otherSubFace.MaterialIndex;
                             thisFace.SubFaces[i] = subFace;
                         }
                     }
@@ -702,6 +744,7 @@ namespace CsgTest
                     if (subFace.FaceCuts.Count < 3) continue;
 
                     var firstIndex = (ushort)vertexOffset;
+                    var materialIndex = subFace.MaterialIndex ?? MaterialIndex;
 
                     foreach (var cut in subFace.FaceCuts)
                     {
@@ -712,7 +755,7 @@ namespace CsgTest
                         texCoords[vertexOffset] = new Vector4(
                             math.dot(basis.tu, vertex),
                             math.dot(basis.tv, vertex),
-                            MaterialIndex,
+                            materialIndex,
                             0f);
 
                         ++vertexOffset;
@@ -773,6 +816,7 @@ namespace CsgTest
     {
         public ConvexPolyhedron Neighbor;
         public List<FaceCut> FaceCuts;
+        public int? MaterialIndex;
 
         public void DrawDebug(BspPlane plane, Color color)
         {

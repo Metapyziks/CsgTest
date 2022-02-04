@@ -265,6 +265,12 @@ namespace CsgTest
                     continue;
                 }
 
+                if (op == BrushOperator.Paint)
+                {
+                    next.PaintMaterial(polyhedron);
+                    continue;
+                }
+
                 var allInside = true;
 
                 for (var faceIndex = 0; faceIndex < polyhedron.FaceCount; ++faceIndex)
