@@ -18,7 +18,8 @@ namespace CsgTest
     public enum Primitive
     {
         Cube,
-        Dodecahedron
+        Dodecahedron,
+        Mesh
     }
 
     public class CsgBrush : MonoBehaviour
@@ -27,18 +28,35 @@ namespace CsgTest
         public Primitive Primitive;
         public int MaterialIndex;
 
+        private void OnValidate()
+        {
+            if (GetComponent<MeshFilter>() != null)
+            {
+                Primitive = Primitive.Mesh;
+            }
+        }
+
         private void OnDrawGizmosSelected()
         {
             Gizmos.matrix = transform.localToWorldMatrix;
             Gizmos.color = Operator == BrushOperator.Add ? Color.blue : Color.yellow;
 
-            if (Primitive == Primitive.Cube)
+            switch (Primitive)
             {
-                Gizmos.DrawWireCube(Vector3.zero, Vector3.one);
-            }
-            else
-            {
-                Gizmos.DrawWireSphere(Vector3.zero, 0.5f);
+                case Primitive.Mesh:
+                {
+                    var meshFilter = GetComponent<MeshFilter>();
+                    if (meshFilter == null) return;
+
+                    Gizmos.DrawWireMesh(meshFilter.sharedMesh);
+                    break;
+                }
+                case Primitive.Cube:
+                    Gizmos.DrawWireCube(Vector3.zero, Vector3.one);
+                    break;
+                default:
+                    Gizmos.DrawWireSphere(Vector3.zero, 0.5f);
+                    break;
             }
         }
     }

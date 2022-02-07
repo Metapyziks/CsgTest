@@ -8,7 +8,7 @@ using Object = UnityEngine.Object;
 
 namespace CsgTest
 {
-    public class ConvexPolyhedron
+    public partial class ConvexPolyhedron
     {
         public static ConvexPolyhedron CreateCube(Bounds bounds)
         {
@@ -60,6 +60,7 @@ namespace CsgTest
         public int FaceCount => _faces.Count;
 
         private bool _vertexPropertiesInvalid = true;
+
         private float3 _vertexAverage;
         private float3 _vertexMin;
         private float3 _vertexMax;

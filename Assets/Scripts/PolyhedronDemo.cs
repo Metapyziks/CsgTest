@@ -50,15 +50,32 @@ namespace CsgTest
 
                 foreach (var brush in transform.GetComponentsInChildren<CsgBrush>())
                 {
-                    var shape = brush.Primitive == Primitive.Cube
-                        ? ConvexPolyhedron.CreateCube(new Bounds(Vector3.zero, Vector3.one))
-                        : ConvexPolyhedron.CreateDodecahedron(Vector3.zero, 0.5f);
+                    ConvexPolyhedron[] polys = Array.Empty<ConvexPolyhedron>();
+
+                    switch (brush.Primitive)
+                    {
+                        case Primitive.Cube:
+                            polys = new[] { ConvexPolyhedron.CreateCube(new Bounds(Vector3.zero, Vector3.one)) };
+                            break;
+
+                        case Primitive.Dodecahedron:
+                            polys = new[] { ConvexPolyhedron.CreateDodecahedron(Vector3.zero, 0.5f) };
+                            break;
+
+                        case Primitive.Mesh:
+                            polys = ConvexPolyhedron.CreateFromMesh(brush.GetComponent<MeshFilter>().sharedMesh);
+                            break;
+                    }
+
                     var matrix = brush.transform.localToWorldMatrix;
 
-                    shape.MaterialIndex = brush.MaterialIndex;
-                    shape.Transform(matrix);
+                    foreach (var poly in polys)
+                    {
+                        poly.MaterialIndex = brush.MaterialIndex;
+                        poly.Transform(matrix);
 
-                    Combine(shape, brush.Operator);
+                        Combine(poly, brush.Operator);
+                    }
                 }
             }
 
