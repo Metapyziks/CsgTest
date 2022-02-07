@@ -306,7 +306,7 @@ namespace CsgTest
                     {
                         MaterialIndex = next.MaterialIndex
                     };
-                    
+
                     child.CopyFaces(_excludedFaces);
 
                     next.Clip(face.Plane, null, child);
