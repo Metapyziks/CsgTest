@@ -61,7 +61,7 @@ namespace CsgTest
                 math.abs(Normal.x - other.Normal.x) <= BspSolid.Epsilon &&
                 math.abs(Normal.y - other.Normal.y) <= BspSolid.Epsilon &&
                 math.abs(Normal.z - other.Normal.z) <= BspSolid.Epsilon && 
-                math.abs(Offset - other.Offset) <= 0.00001f;
+                math.abs(Offset - other.Offset) <= BspSolid.Epsilon * 10f;
         }
 
         public override bool Equals(object obj)

@@ -13,9 +13,6 @@ namespace CsgTest
     {
         private readonly List<ConvexPolyhedron> _polyhedra = new List<ConvexPolyhedron>();
 
-        private readonly HashSet<ConvexPolyhedron> _visited = new HashSet<ConvexPolyhedron>();
-        private readonly Queue<ConvexPolyhedron> _visitQueue = new Queue<ConvexPolyhedron>();
-
         private bool _geometryInvalid;
         private bool _meshInvalid;
 
@@ -26,8 +23,6 @@ namespace CsgTest
         private Mesh _mesh;
 
         private bool _hasRigidBody;
-
-        public Transform Anchor;
 
         void Start()
         {
@@ -157,69 +152,96 @@ namespace CsgTest
             }
         }
 
+        [ThreadStatic] private static List<(ConvexPolyhedron, float)> _sChunks;
+        [ThreadStatic] private static HashSet<ConvexPolyhedron> _sVisited;
+        [ThreadStatic] private static Queue<ConvexPolyhedron> _sVisitQueue;
+
+        private static List<(ConvexPolyhedron Root, float Volume)> GetChunkList()
+        {
+            var list = _sChunks ?? (_sChunks = new List<(ConvexPolyhedron, float)>());
+            list.Clear();
+
+            return list;
+        }
+
+        private static HashSet<ConvexPolyhedron> GetVisitedSet()
+        {
+            var set = _sVisited ?? (_sVisited = new HashSet<ConvexPolyhedron>());
+            set.Clear();
+
+            return set;
+        }
+
+        private static Queue<ConvexPolyhedron> GetVisitedQueue()
+        {
+            var queue = _sVisitQueue ?? (_sVisitQueue = new Queue<ConvexPolyhedron>());
+            queue.Clear();
+
+            return queue;
+        }
+
         private void RemoveDisconnectedPolyhedra()
         {
             if (_polyhedra.Count == 0) return;
 
-            _visitQueue.Clear();
-            _visited.Clear();
+            var chunks = GetChunkList();
+            var visited = GetVisitedSet();
+            var queue = GetVisitedQueue();
 
-            if (Anchor != null)
+            while (visited.Count < _polyhedra.Count)
             {
-                var anchorPos = (float3) Anchor.position;
-                var match = _polyhedra.FirstOrDefault(x => x.Contains(anchorPos));
+                queue.Clear();
 
-                if (match == null)
+                ConvexPolyhedron root = null;
+
+                foreach (var poly in _polyhedra)
                 {
-                    return;
+                    if (visited.Contains(poly)) continue;
+
+                    root = poly;
+                    break;
                 }
 
-                _visited.Add(match);
-                _visitQueue.Enqueue(match);
-            }
-            else
-            {
-                _visited.Add(_polyhedra[0]);
-                _visitQueue.Enqueue(_polyhedra[0]);
-            }
+                Debug.Assert(root != null);
 
-            while (_visitQueue.Count > 0)
-            {
-                _visitQueue.Dequeue().AddNeighbors(_visited, _visitQueue);
-            }
+                visited.Add(root);
+                queue.Enqueue(root);
 
-            if (_visited.Count == _polyhedra.Count) return;
+                var volume = 0f;
 
-            var disconnected = new List<ConvexPolyhedron>();
-
-            for (var i = _polyhedra.Count - 1; i >= 0; --i)
-            {
-                var poly = _polyhedra[i];
-
-                if (_visited.Contains(poly)) continue;
-
-                disconnected.Add(poly);
-                _polyhedra.RemoveAt(i);
-            }
-
-            while (disconnected.Count > 0)
-            {
-                _visited.Clear();
-                _visitQueue.Clear();
-
-                var last = disconnected[disconnected.Count - 1];
-
-                _visitQueue.Enqueue(last);
-                _visited.Add(last);
-
-                while (_visitQueue.Count > 0)
+                while (queue.Count > 0)
                 {
-                    var next = _visitQueue.Dequeue();
-                    disconnected.Remove(next);
+                    var next = queue.Dequeue();
+
+                    volume += next.Volume;
+
+                    next.AddNeighbors(visited, queue);
+                }
+
+                chunks.Add((root, volume));
+            }
+
+            if (chunks.Count == 1) return;
+
+            chunks.Sort((a, b) => Math.Sign(b.Volume - a.Volume));
+
+            foreach (var chunk in chunks.Skip(1))
+            {
+                visited.Clear();
+                queue.Clear();
+
+                queue.Enqueue(chunk.Root);
+                visited.Add(chunk.Root);
+
+                while (queue.Count > 0)
+                {
+                    var next = queue.Dequeue();
 
                     next.InvalidateMesh();
-                    next.AddNeighbors(_visited, _visitQueue);
+                    next.AddNeighbors(visited, queue);
                 }
+
+                _polyhedra.RemoveAll(x => visited.Contains(x));
 
                 var child = new GameObject("Debris", typeof(Rigidbody), typeof(MeshFilter), typeof(MeshRenderer),
                     typeof(PolyhedronDemo))
@@ -234,7 +256,7 @@ namespace CsgTest
 
                 child.GetComponent<MeshRenderer>().sharedMaterial = GetComponent<MeshRenderer>().sharedMaterial;
 
-                child._polyhedra.AddRange(_visited);
+                child._polyhedra.AddRange(visited);
                 child._meshInvalid = true;
 
                 child.Start();
