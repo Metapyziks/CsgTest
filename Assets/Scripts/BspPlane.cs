@@ -52,7 +52,16 @@ namespace CsgTest
 
         public bool Equals(BspPlane other)
         {
-            return Normal.Equals(other.Normal) && math.abs(Offset - other.Offset) <= BspSolid.Epsilon;
+            return Normal.Equals(other.Normal) && Offset.Equals(other.Offset);
+        }
+
+        public bool Equals(BspPlane other, float epsilon)
+        {
+            return 
+                math.abs(Normal.x - other.Normal.x) <= epsilon &&
+                math.abs(Normal.y - other.Normal.y) <= epsilon &&
+                math.abs(Normal.z - other.Normal.z) <= epsilon && 
+                math.abs(Offset - other.Offset) <= epsilon;
         }
 
         public override bool Equals(object obj)

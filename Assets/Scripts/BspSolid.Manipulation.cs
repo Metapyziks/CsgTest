@@ -309,7 +309,7 @@ namespace CsgTest
 
             foreach (var otherPlane in planes)
             {
-                if (otherPlane.Equals(excludingPlane))
+                if (otherPlane.Equals(excludingPlane, BspSolid.Epsilon))
                 {
                     continue;
                 }

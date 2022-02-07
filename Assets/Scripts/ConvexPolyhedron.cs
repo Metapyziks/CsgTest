@@ -350,7 +350,7 @@ namespace CsgTest
         {
             foreach (var face in _faces)
             {
-                if (!face.Plane.Equals(plane)) continue;
+                if (!face.Plane.Equals(plane, BspSolid.Epsilon)) continue;
 
                 for (var i = 0; i < face.SubFaces.Count; ++i)
                 {
@@ -369,7 +369,7 @@ namespace CsgTest
         {
             foreach (var face in _faces)
             {
-                if (!face.Plane.Equals(plane)) continue;
+                if (!face.Plane.Equals(plane, BspSolid.Epsilon)) continue;
 
                 for (var i = face.SubFaces.Count - 1; i >= 0; --i)
                 {
@@ -490,7 +490,7 @@ namespace CsgTest
         {
             foreach (var face in _faces)
             {
-                if (face.Plane.Equals(plane))
+                if (face.Plane.Equals(plane, BspSolid.Epsilon))
                 {
                     matchingFace = face;
                     return true;
@@ -608,7 +608,10 @@ namespace CsgTest
                 {
                     var other = _faces[i];
 
-                    if (plane.Equals(other.Plane)) continue;
+                    if (plane.Equals(other.Plane, BspSolid.Epsilon))
+                    {
+                        return (true, false);
+                    }
 
                     var planeCut = Helpers.GetFaceCut(plane, other.Plane, planeBasis);
 
@@ -625,9 +628,9 @@ namespace CsgTest
             {
                 var other = _faces[i];
 
-                if (plane.Equals(other.Plane))
+                if (plane.Equals(other.Plane, BspSolid.Epsilon))
                 {
-                    continue;
+                    return (true, false);
                 }
 
                 var otherBasis = other.Plane.GetBasis();
