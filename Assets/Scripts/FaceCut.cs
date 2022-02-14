@@ -36,10 +36,12 @@ namespace CsgTest
         public float Min;
         public float Max;
 
+        public float3? MinNormal;
+
         public bool ExcludesAll => float.IsPositiveInfinity(Distance);
         public bool ExcludesNone => float.IsNegativeInfinity(Distance);
 
-        public FaceCut(float2 normal, float distance, float min, float max) => (Normal, Angle, Distance, Min, Max) = (normal, math.atan2(normal.y, normal.x), distance, min, max);
+        public FaceCut(float2 normal, float distance, float min, float max) => (Normal, Angle, Distance, Min, Max, MinNormal) = (normal, math.atan2(normal.y, normal.x), distance, min, max, null);
         
         public float3 GetPoint(in (float3 origin, float3 tu, float3 tv) basis)
         {
@@ -138,6 +140,23 @@ namespace CsgTest
 
             Debug.DrawLine(min, max, color);
             Debug.DrawLine(mid, mid + norm, color);
+        }
+
+        public void DrawGizmos(BspPlane plane)
+        {
+            DrawGizmos(plane.GetBasis());
+        }
+
+        public void DrawGizmos(in (float3 origin, float3 tu, float3 tv) basis)
+        {
+            var min = GetPoint(basis, Min);
+            var max = GetPoint(basis, Max);
+
+            var mid = (min + max) * 0.5f;
+            var norm = Normal.x * basis.tu + Normal.y * basis.tv;
+
+            Gizmos.DrawLine(min, max);
+            Gizmos.DrawLine(mid, mid + norm);
         }
     }
 }

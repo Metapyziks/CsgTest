@@ -646,7 +646,7 @@ namespace CsgTest
                 {
                     if (planeExclusions.ExcludesAll)
                     {
-                        Assert.IsFalse(excludedAny);
+                        // Assert.IsFalse(excludedAny);
 
                         return (true, false);
                     }
@@ -902,10 +902,7 @@ namespace CsgTest
 
             foreach (var cut in FaceCuts)
             {
-                var min = cut.GetPoint(basis, cut.Min);
-                var max = cut.GetPoint(basis, cut.Max);
-
-                Gizmos.DrawLine(min, max);
+                cut.DrawGizmos(basis);
             }
         }
 

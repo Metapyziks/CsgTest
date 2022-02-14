@@ -55,13 +55,15 @@ namespace CsgTest
             return Normal.Equals(other.Normal) && Offset.Equals(other.Offset);
         }
 
-        public bool ApproxEquals(BspPlane other)
+        public bool ApproxEquals(BspPlane other,
+            float normalEpsilon = BspSolid.Epsilon,
+            float offsetEpsilon = BspSolid.Epsilon * 10f)
         {
             return 
-                math.abs(Normal.x - other.Normal.x) <= BspSolid.Epsilon &&
-                math.abs(Normal.y - other.Normal.y) <= BspSolid.Epsilon &&
-                math.abs(Normal.z - other.Normal.z) <= BspSolid.Epsilon && 
-                math.abs(Offset - other.Offset) <= BspSolid.Epsilon * 10f;
+                math.abs(Normal.x - other.Normal.x) <= normalEpsilon &&
+                math.abs(Normal.y - other.Normal.y) <= normalEpsilon &&
+                math.abs(Normal.z - other.Normal.z) <= normalEpsilon && 
+                math.abs(Offset - other.Offset) <= offsetEpsilon;
         }
 
         public override bool Equals(object obj)

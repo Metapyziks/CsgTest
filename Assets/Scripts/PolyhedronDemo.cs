@@ -281,10 +281,11 @@ namespace CsgTest
             }
         }
 
-        private readonly HashSet<ConvexFace> _excludedFaces = new HashSet<ConvexFace>();
+        [ThreadStatic]
+        private static HashSet<ConvexFace> _sExcludedFaces;
 
-        private readonly List<ConvexPolyhedron> _intersections =
-            new List<ConvexPolyhedron>();
+        [ThreadStatic]
+        private static List<ConvexPolyhedron> _sIntersections;
 
         public bool Combine(ConvexPolyhedron polyhedron, BrushOperator op)
         {
@@ -296,7 +297,10 @@ namespace CsgTest
             var min = polyhedron.VertexMin - BspSolid.Epsilon;
             var max = polyhedron.VertexMax + BspSolid.Epsilon;
 
-            _intersections.Clear();
+            var intersections = _sIntersections ?? (_sIntersections = new List<ConvexPolyhedron>());
+            var excludedFaces = _sExcludedFaces ?? (_sExcludedFaces = new HashSet<ConvexFace>());
+
+            intersections.Clear();
 
             for (var polyIndex = _polyhedra.Count - 1; polyIndex >= 0; --polyIndex)
             {
@@ -325,9 +329,9 @@ namespace CsgTest
                 {
                     var face = polyhedron.GetFace(faceIndex);
 
-                    _excludedFaces.Clear();
+                    excludedFaces.Clear();
                     var (excludedNone, excludedAll) = next.Clip(face.Plane,
-                        face.FaceCuts, null, _excludedFaces, dryRun: true);
+                        face.FaceCuts, null, excludedFaces, dryRun: true);
 
                     if (excludedNone)
                     {
@@ -346,7 +350,7 @@ namespace CsgTest
                         MaterialIndex = next.MaterialIndex
                     };
 
-                    child.CopyFaces(_excludedFaces);
+                    child.CopyFaces(excludedFaces);
 
                     next.Clip(face.Plane, null, child);
                     child.Clip(-face.Plane, null, next);
@@ -387,7 +391,7 @@ namespace CsgTest
                         break;
 
                     case BrushOperator.Add:
-                        _intersections.Add(next);
+                        intersections.Add(next);
                         _polyhedra.RemoveAt(polyIndex);
                         break;
 
@@ -405,7 +409,7 @@ namespace CsgTest
                 polyhedron = polyhedron.Clone();
                 _polyhedra.Add(polyhedron);
 
-                foreach (var intersection in _intersections)
+                foreach (var intersection in intersections)
                 {
                     polyhedron.CopySubFaces(intersection);
                     intersection.Removed(polyhedron);
