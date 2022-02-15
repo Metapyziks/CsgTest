@@ -552,7 +552,7 @@ namespace CsgTest
 
         public bool Clip(BspPlane plane)
         {
-            var (excludedNone, excludedAll) = Clip(plane, null, null);
+            var (excludedNone, _, _) = Clip(plane, null, null);
 
             return !excludedNone;
         }
@@ -562,12 +562,12 @@ namespace CsgTest
         /// </summary>
         /// <param name="plane">Plane to clip by.</param>
         /// <returns>True if anything was clipped.</returns>
-        internal (bool ExcludedNone, bool ExcludedAll) Clip(BspPlane plane, List<FaceCut> faceCuts,
+        internal (bool ExcludedNone, bool ExcludedAll, ConvexFace face) Clip(BspPlane plane, List<FaceCut> faceCuts,
             ConvexPolyhedron neighbor, HashSet<ConvexFace> excluded = null, bool dryRun = false)
         {
             if (IsEmpty)
             {
-                return (true, false);
+                return (true, false, default);
             }
 
             var face = new ConvexFace
@@ -594,7 +594,7 @@ namespace CsgTest
                     InvalidateMesh();
                 }
 
-                return (false, false);
+                return (false, false, default);
             }
 
             var planeBasis = plane.GetBasis();
@@ -611,7 +611,7 @@ namespace CsgTest
 
                     if (plane.ApproxEquals(other.Plane))
                     {
-                        return (true, false);
+                        return (true, false, default);
                     }
 
                     var planeCut = Helpers.GetFaceCut(plane, other.Plane, planeBasis);
@@ -620,7 +620,7 @@ namespace CsgTest
 
                     if (auxExclusions.ExcludesAll)
                     {
-                        return (true, true);
+                        return (true, true, default);
                     }
                 }
             }
@@ -631,7 +631,7 @@ namespace CsgTest
 
                 if (plane.ApproxEquals(other.Plane))
                 {
-                    return (true, false);
+                    return (true, false, default);
                 }
 
                 var otherBasis = other.Plane.GetBasis();
@@ -648,7 +648,7 @@ namespace CsgTest
                     {
                         // Assert.IsFalse(excludedAny);
 
-                        return (true, false);
+                        return (true, false, default);
                     }
 
                     if (planeExclusions.ExcludesNone)
@@ -718,7 +718,7 @@ namespace CsgTest
 
             if (anyIntersections && !excludedAny)
             {
-                return (true, false);
+                return (true, false, default);
             }
 
             if (anyIntersections && remainingFacesCount == 0)
@@ -728,13 +728,13 @@ namespace CsgTest
                     SetEmpty();
                 }
 
-                return (false, true);
+                return (false, true, default);
             }
+
+            face.FaceCuts.Sort(FaceCut.Comparer);
 
             if (!dryRun)
             {
-                face.FaceCuts.Sort(FaceCut.Comparer);
-
                 face.SubFaces = new List<SubFace>
                 {
                     new SubFace
@@ -748,7 +748,7 @@ namespace CsgTest
                 InvalidateMesh();
             }
 
-            return (false, false);
+            return (false, false, face);
         }
 
         public (int FaceCount, int VertexCount) GetMeshInfo()

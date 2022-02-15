@@ -81,6 +81,16 @@ namespace CsgTest
             return Normal.Equals(other.Normal) && Distance.Equals(other.Distance);
         }
 
+        public bool ApproxEquals(FaceCut other,
+            float normalEpsilon = BspSolid.Epsilon,
+            float offsetEpsilon = BspSolid.Epsilon * 10f)
+        {
+            return
+                math.abs(Normal.x - other.Normal.x) <= normalEpsilon &&
+                math.abs(Normal.y - other.Normal.y) <= normalEpsilon &&
+                math.abs(Distance - other.Distance) <= offsetEpsilon;
+        }
+
         public override bool Equals(object obj)
         {
             return obj is FaceCut other && Equals(other);
@@ -156,7 +166,7 @@ namespace CsgTest
             var norm = Normal.x * basis.tu + Normal.y * basis.tv;
 
             Gizmos.DrawLine(min, max);
-            Gizmos.DrawLine(mid, mid + norm);
+            Gizmos.DrawLine(mid, mid + norm * math.length(max - min) * 0.1f);
         }
     }
 }

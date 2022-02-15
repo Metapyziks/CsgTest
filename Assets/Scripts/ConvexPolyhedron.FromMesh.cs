@@ -13,6 +13,7 @@ namespace CsgTest
         private class MeshDecomposer
         {
             private readonly List<Vector3> _vertices = new List<Vector3>();
+            private readonly List<Vector3> _uniqueVertices = new List<Vector3>();
             private readonly List<int> _indices = new List<int>();
             private readonly List<int> _mergedIndices = new List<int>();
             private readonly Dictionary<int3, int> _mergedVertices = new Dictionary<int3, int>();
@@ -20,9 +21,14 @@ namespace CsgTest
             private float3 _vertexMergeGridScale;
             private const int VertexMergeGridResolution = 1000;
 
-            private readonly List<Face> _faces = new List<Face>();
+            private readonly List<(Face Face, int Excluded)> _faces = new List<(Face, int)>();
             private readonly Dictionary<Edge, (Face A, Face B)> _edges =
                 new Dictionary<Edge, (Face A, Face B)>();
+
+            private readonly HashSet<ConvexFace> _excludedFaces = new HashSet<ConvexFace>();
+            private readonly List<FaceCut> _faceCuts = new List<FaceCut>();
+
+            private readonly List<ConvexPolyhedron> _finalPolys = new List<ConvexPolyhedron>();
 
             private class Face
             {
@@ -80,37 +86,61 @@ namespace CsgTest
                 }
             }
 
-            [ThreadStatic]
-            private static HashSet<ConvexFace> _sExcludedFaces;
+            private bool ApproxEquals(List<FaceCut> cutsA, List<FaceCut> cutsB)
+            {
+                if (cutsA.Count != cutsB.Count) return false;
+
+                for (var i = 0; i < cutsA.Count; ++i)
+                {
+                    var a = cutsA[i];
+                    var b = cutsB[i];
+
+                    if (!a.ApproxEquals(b)) return false;
+                }
+
+                return true;
+            }
 
             public ConvexPolyhedron[] Decompose(Mesh mesh)
             {
-                // return Array.Empty<ConvexPolyhedron>();
-
                 Reset();
                 ReadFromMesh(mesh);
                 PopulateEdgesFaces();
-                MergeCoplanarFaces();
+                // MergeCoplanarFaces();
+                SortFaces();
 
-                var finalPolys = new List<ConvexPolyhedron>();
                 var polyQueue = new Queue<(ConvexPolyhedron Poly, int NextFace)>();
-
-                var excludedFaces = _sExcludedFaces ?? (_sExcludedFaces = new HashSet<ConvexFace>());
 
                 polyQueue.Enqueue((new ConvexPolyhedron(), 0));
 
-                while (polyQueue.Count > 0)
+                while (polyQueue.Count > 0 && polyQueue.Count < 1000)
                 {
                     var (poly, nextFace) = polyQueue.Dequeue();
+                    var anyInside = false;
 
                     for (var i = nextFace; i < _faces.Count; ++i)
                     {
-                        var face = _faces[i];
+                        var (face, excludedCount) = _faces[i];
 
-                        // TODO: face cuts
+                        _faceCuts.Clear();
 
-                        excludedFaces.Clear();
-                        var (excludedNone, excludedAll) = poly.Clip(face.Plane, null, null, excludedFaces, true);
+                        var basis = face.Plane.GetBasis();
+
+                        foreach (var edge in face.Edges)
+                        {
+                            var a = (float3)_vertices[edge.VertexAIndex];
+                            var b = (float3)_vertices[edge.VertexBIndex];
+
+                            var abPlane = new BspPlane(math.cross(face.Plane.Normal, a - b), a);
+                            var abCut = Helpers.GetFaceCut(face.Plane, abPlane, basis);
+
+                            _faceCuts.AddFaceCut(abCut);
+                        }
+
+                        _faceCuts.Sort(FaceCut.Comparer);
+
+                        _excludedFaces.Clear();
+                        var (excludedNone, excludedAll, newFace) = poly.Clip(face.Plane, _faceCuts, null, _excludedFaces, true);
 
                         if (excludedNone)
                         {
@@ -123,9 +153,17 @@ namespace CsgTest
                             break;
                         }
 
+                        anyInside = true;
+
+                        if (excludedCount == 0 || ApproxEquals(_faceCuts, newFace.FaceCuts))
+                        {
+                            poly.Clip(face.Plane);
+                            continue;
+                        }
+
                         var child = new ConvexPolyhedron();
 
-                        child.CopyFaces(excludedFaces);
+                        child.CopyFaces(_excludedFaces);
 
                         poly.Clip(face.Plane, null, child);
                         child.Clip(-face.Plane, null, poly);
@@ -141,20 +179,26 @@ namespace CsgTest
                         }
                     }
 
-                    if (!poly.IsEmpty)
+                    if (anyInside && !poly.IsEmpty)
                     {
                         poly.InvalidateMesh();
-                        finalPolys.Add(poly);
+                        _finalPolys.Add(poly);
+                    }
+                    else
+                    {
+                        poly.Removed(null);
                     }
                 }
 
-                return finalPolys.ToArray();
+                return _finalPolys.ToArray();
             }
 
             private void Reset()
             {
                 _edges.Clear();
                 _faces.Clear();
+
+                _finalPolys.Clear();
             }
 
             private static readonly int[] _sMergeOffsets1D = new[] { 0, -1, 1 };
@@ -169,6 +213,7 @@ namespace CsgTest
             private void ReadFromMesh(Mesh mesh)
             {
                 _vertices.Clear();
+                _uniqueVertices.Clear();
                 _indices.Clear();
 
                 Debug.Assert(mesh.GetTopology(0) == MeshTopology.Triangles);
@@ -214,6 +259,7 @@ namespace CsgTest
 
                     if (found) continue;
 
+                    _uniqueVertices.Add(_vertices[i]);
                     _mergedVertices.Add(index3, i);
                     _mergedIndices.Add(i);
                 }
@@ -259,6 +305,11 @@ namespace CsgTest
                                 throw new Exception("Unsupported geometry");
                             }
 
+                            if (facePair.A == face)
+                            {
+                                throw new Exception("Unsupported geometry");
+                            }
+
                             _edges[-edge] = (facePair.A, face);
                         }
                         else
@@ -267,7 +318,7 @@ namespace CsgTest
                         }
                     }
 
-                    _faces.Add(face);
+                    _faces.Add((face, -1));
                 }
 
                 foreach (var pair in _edges)
@@ -283,7 +334,7 @@ namespace CsgTest
             {
                 for (var i = _faces.Count - 1; i >= 0; --i)
                 {
-                    var face = _faces[i];
+                    var (face, _) = _faces[i];
                     Face coplanarFace = null;
 
                     var fromIndex = 0;
@@ -294,6 +345,11 @@ namespace CsgTest
                         var edge = face.Edges[edgeIndex];
                         var pair = _edges[edge];
                         var otherFace = pair.A == face ? pair.B : pair.A;
+
+                        if (otherFace == face)
+                        {
+                            throw new Exception("Invalid edge");
+                        }
 
                         if (!otherFace.Plane.ApproxEquals(face.Plane, 0.01f, 0.01f))
                         {
@@ -319,6 +375,11 @@ namespace CsgTest
 
                     _faces.RemoveAt(i);
 
+                    if (face.Edges.Count > 100)
+                    {
+                        throw new Exception("Maybe stuck in a loop");
+                    }
+
                     for (var j = 1; j < face.Edges.Count; ++j)
                     {
                         var edge = face.Edges[(fromIndex + j) % face.Edges.Count];
@@ -326,11 +387,11 @@ namespace CsgTest
 
                         coplanarFace.Edges.Insert(insertIndex++, edge);
 
-                        if (pair.A == face)
+                        if (pair.A == face && pair.B != coplanarFace)
                         {
                             _edges[edge] = (coplanarFace, pair.B);
                         }
-                        else if (pair.B == face)
+                        else if (pair.B == face && pair.A != coplanarFace)
                         {
                             _edges[-edge] = (pair.A, coplanarFace);
                         }
@@ -340,6 +401,37 @@ namespace CsgTest
                         }
                     }
                 }
+            }
+
+            private static int GetFaceScore(int excluded, int vertexCount)
+            {
+                return excluded == 0 ? -1 : math.abs(excluded * 2 - vertexCount);
+            }
+
+            private void SortFaces()
+            {
+                for (var i = 0; i < _faces.Count; ++i)
+                {
+                    var (face, _) = _faces[i];
+                    var excludedCount = 0;
+
+                    foreach (var vertex in _uniqueVertices)
+                    {
+                        var offset = math.dot(vertex, face.Plane.Normal) - face.Plane.Offset;
+
+                        if (offset < -0.001f)
+                        {
+                            ++excludedCount;
+                        }
+                    }
+
+                    _faces[i] = (face, excludedCount);
+                }
+
+                var vertexCount = _uniqueVertices.Count;
+
+                _faces.Sort((a, b) =>
+                    GetFaceScore(a.Excluded, vertexCount) - GetFaceScore(b.Excluded, vertexCount));
             }
         }
 

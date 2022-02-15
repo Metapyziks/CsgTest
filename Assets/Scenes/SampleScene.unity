@@ -233,7 +233,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1380967429039715679, guid: 1162f20cf9a412c4fb8575b2950fa3df, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 2.71
+      value: 11.6
       objectReference: {fileID: 0}
     - target: {fileID: 1380967429039715679, guid: 1162f20cf9a412c4fb8575b2950fa3df, type: 3}
       propertyPath: m_LocalPosition.z
@@ -323,7 +323,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   Operator: 0
   Primitive: 2
-  MaterialIndex: 1
+  MaterialIndex: 0
 --- !u!33 &1139928327
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -331,7 +331,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1139928324}
-  m_Mesh: {fileID: 289301614986012343, guid: b9d2ceff10b7f2d46ab0fb39bd9f9d87, type: 3}
+  m_Mesh: {fileID: -5495902117074765545, guid: b7a47b348c685c942b4a8ae1034fa777, type: 3}
 --- !u!1 &1305113495
 GameObject:
   m_ObjectHideFlags: 0

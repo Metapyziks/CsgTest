@@ -330,7 +330,7 @@ namespace CsgTest
                     var face = polyhedron.GetFace(faceIndex);
 
                     excludedFaces.Clear();
-                    var (excludedNone, excludedAll) = next.Clip(face.Plane,
+                    var (excludedNone, excludedAll, _) = next.Clip(face.Plane,
                         face.FaceCuts, null, excludedFaces, dryRun: true);
 
                     if (excludedNone)
