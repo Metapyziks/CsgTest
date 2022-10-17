@@ -5,6 +5,7 @@ using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Assertions;
 using Object = UnityEngine.Object;
+using Random = Unity.Mathematics.Random;
 
 namespace CsgTest
 {
@@ -24,30 +25,36 @@ namespace CsgTest
             return mesh;
         }
 
-        private static float3 DistortNormal( float3 normal, float distortion )
+        private static float3 DistortNormal( float3 normal, ref Random random, float distortion )
         {
             if ( distortion <= 0f ) return normal;
 
-            normal += (float3)UnityEngine.Random.onUnitSphere * distortion;
+            normal += random.NextFloat3Direction() * distortion;
 
             return math.normalizesafe( normal );
         }
 
-        public static ConvexPolyhedron CreateDodecahedron(float3 center, float radius, float distortion = 0f)
+        public static ConvexPolyhedron CreateDodecahedron( float3 center, float radius )
+        {
+            Random random = default;
+            return CreateDodecahedron( center, radius, ref random, 0f );
+        }
+
+        public static ConvexPolyhedron CreateDodecahedron(float3 center, float radius, ref Random random, float distortion)
         {
             distortion = math.clamp( distortion, 0f, 1f ) * 0.25f;
 
             var mesh = new ConvexPolyhedron();
 
-            mesh.Clip(new BspPlane(DistortNormal(new float3(0f, 1f, 0f), distortion), -radius));
-            mesh.Clip(new BspPlane(DistortNormal(new float3(0f, -1f, 0f), distortion), -radius));
+            mesh.Clip(new BspPlane(DistortNormal(new float3(0f, 1f, 0f), ref random, distortion), -radius));
+            mesh.Clip(new BspPlane(DistortNormal(new float3(0f, -1f, 0f), ref random, distortion), -radius));
 
             var rot = Quaternion.AngleAxis(60f, Vector3.right);
 
             for (var i = 0; i < 5; ++i)
             {
-                mesh.Clip(new BspPlane(DistortNormal(rot * Vector3.down, distortion), -radius));
-                mesh.Clip(new BspPlane(DistortNormal(rot * Vector3.up, distortion), -radius));
+                mesh.Clip(new BspPlane(DistortNormal(rot * Vector3.down, ref random, distortion), -radius));
+                mesh.Clip(new BspPlane(DistortNormal(rot * Vector3.up, ref random, distortion), -radius));
 
                 rot = Quaternion.AngleAxis(72f, Vector3.up) * rot;
             }

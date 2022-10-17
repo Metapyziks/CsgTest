@@ -1,7 +1,9 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using Unity.Mathematics;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 namespace CsgTest
 {
@@ -21,13 +23,16 @@ namespace CsgTest
                 UnityEngine.Random.value * 0.125f + 1f,
                 UnityEngine.Random.value * 0.125f + 1f) * SubtractSize;
 
-            var mesh = ConvexPolyhedron.CreateDodecahedron(float3.zero, 0.5f, 1f);
+            var randomA = new Unity.Mathematics.Random( (uint) new System.Random().Next() );
+            var randomB = randomA;
+
+            var mesh = ConvexPolyhedron.CreateDodecahedron(float3.zero, 0.5f, ref randomA, 1f);
             mesh.Transform(math.mul(worldToLocal, float4x4.TRS(position, rotation, localScale)));
             polyDemo.Combine(mesh, BrushOperator.Subtract);
-            
+
+            mesh = ConvexPolyhedron.CreateDodecahedron(float3.zero, 0.55f, ref randomB, 1f);
             mesh.MaterialIndex = 1;
-            mesh.Transform(float4x4.Translate( -position ));
-            mesh.Transform( float4x4.TRS( position, quaternion.identity, 1.1f ) );
+            mesh.Transform(math.mul(worldToLocal, float4x4.TRS(position, rotation, localScale)));
             polyDemo.Combine(mesh, BrushOperator.Paint);
 
             var ps = GetComponent<ParticleSystem>();
