@@ -2,11 +2,12 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using Newtonsoft.Json;
 using Unity.Collections;
 using UnityEngine;
 
 using Unity.Mathematics;
+using Unity.Plastic.Newtonsoft.Json;
+using Random = System.Random;
 
 namespace CsgTest
 {
@@ -62,6 +63,8 @@ namespace CsgTest
 
                 rot = Quaternion.AngleAxis(72f, Vector3.up) * rot;
             }
+
+            mesh.Transform( float4x4.Translate( center ) );
 
             return mesh;
         }

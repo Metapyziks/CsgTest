@@ -24,22 +24,35 @@ namespace CsgTest
             return mesh;
         }
 
-        public static ConvexPolyhedron CreateDodecahedron(float3 center, float radius)
+        private static float3 DistortNormal( float3 normal, float distortion )
         {
+            if ( distortion <= 0f ) return normal;
+
+            normal += (float3)UnityEngine.Random.onUnitSphere * distortion;
+
+            return math.normalizesafe( normal );
+        }
+
+        public static ConvexPolyhedron CreateDodecahedron(float3 center, float radius, float distortion = 0f)
+        {
+            distortion = math.clamp( distortion, 0f, 1f ) * 0.25f;
+
             var mesh = new ConvexPolyhedron();
 
-            mesh.Clip(new BspPlane(new float3(0f, 1f, 0f), -radius));
-            mesh.Clip(new BspPlane(new float3(0f, -1f, 0f), -radius));
+            mesh.Clip(new BspPlane(DistortNormal(new float3(0f, 1f, 0f), distortion), -radius));
+            mesh.Clip(new BspPlane(DistortNormal(new float3(0f, -1f, 0f), distortion), -radius));
 
             var rot = Quaternion.AngleAxis(60f, Vector3.right);
 
             for (var i = 0; i < 5; ++i)
             {
-                mesh.Clip(new BspPlane(rot * Vector3.down, -radius));
-                mesh.Clip(new BspPlane(rot * Vector3.up, -radius));
+                mesh.Clip(new BspPlane(DistortNormal(rot * Vector3.down, distortion), -radius));
+                mesh.Clip(new BspPlane(DistortNormal(rot * Vector3.up, distortion), -radius));
 
                 rot = Quaternion.AngleAxis(72f, Vector3.up) * rot;
             }
+
+            mesh.Transform( float4x4.Translate( center ) );
 
             return mesh;
         }
@@ -524,7 +537,7 @@ namespace CsgTest
 
                         foreach (var subFaceCut in otherSubFace.FaceCuts)
                         {
-                            if (thisFace.FaceCuts.Contains(subFaceCut, BspSolid.Epsilon * 8f))
+                            if (thisFace.FaceCuts.Contains(subFaceCut))
                             {
                                 continue;
                             }
@@ -829,9 +842,12 @@ namespace CsgTest
 
         public void DrawGizmos()
         {
-            foreach (var face in _faces)
+            if ( Index == 8 )
             {
-                face.DrawGizmos();
+                foreach (var face in _faces)
+                {
+                    face.DrawGizmos();
+                }
             }
 
 #if UNITY_EDITOR
@@ -900,12 +916,15 @@ namespace CsgTest
         {
             var basis = Plane.GetBasis();
 
-            foreach (var cut in FaceCuts)
+            foreach ( var subFace in SubFaces )
             {
-                var min = cut.GetPoint(basis, cut.Min);
-                var max = cut.GetPoint(basis, cut.Max);
+                foreach (var cut in subFace.FaceCuts)
+                {
+                    var min = cut.GetPoint(basis, cut.Min);
+                    var max = cut.GetPoint(basis, cut.Max);
 
-                Gizmos.DrawLine(min, max);
+                    Gizmos.DrawLine(min, max);
+                }
             }
         }
 

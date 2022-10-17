@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
 using Unity.Collections;
 using Unity.Mathematics;
+using Unity.Plastic.Newtonsoft.Json;
+using Unity.Plastic.Newtonsoft.Json.Converters;
 using UnityEngine;
 
 namespace CsgTest

@@ -293,8 +293,10 @@ namespace CsgTest
             var changed = false;
             var maybeOutside = false;
 
-            var min = polyhedron.VertexMin - BspSolid.Epsilon;
-            var max = polyhedron.VertexMax + BspSolid.Epsilon;
+            var size = polyhedron.VertexMax - polyhedron.VertexMin;
+
+            var min = polyhedron.VertexMin - BspSolid.DistanceEpsilon;
+            var max = polyhedron.VertexMax + BspSolid.DistanceEpsilon;
 
             _intersections.Clear();
 

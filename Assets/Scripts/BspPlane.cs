@@ -1,6 +1,6 @@
 ﻿using System;
-using Newtonsoft.Json;
 using Unity.Mathematics;
+using Unity.Plastic.Newtonsoft.Json;
 
 namespace CsgTest
 {
@@ -57,11 +57,9 @@ namespace CsgTest
 
         public bool ApproxEquals(BspPlane other)
         {
-            return 
-                math.abs(Normal.x - other.Normal.x) <= BspSolid.Epsilon &&
-                math.abs(Normal.y - other.Normal.y) <= BspSolid.Epsilon &&
-                math.abs(Normal.z - other.Normal.z) <= BspSolid.Epsilon && 
-                math.abs(Offset - other.Offset) <= BspSolid.Epsilon * 10f;
+            return
+                math.abs( 1f - math.dot( Normal, other.Normal ) ) < BspSolid.UnitEpsilon &&
+                math.abs( Offset - other.Offset ) <= BspSolid.DistanceEpsilon;
         }
 
         public override bool Equals(object obj)

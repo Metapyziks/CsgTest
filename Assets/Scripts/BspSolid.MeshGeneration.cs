@@ -290,7 +290,7 @@ namespace CsgTest
 
                     if (!_enableIndexFilter && negativeLeaf == positiveLeaf) continue;
 
-                    _faceCuts.RemoveAll(x => x.Max <= x.Min + Epsilon);
+                    _faceCuts.RemoveAll(x => x.Max <= x.Min + DistanceEpsilon);
 
                     if (_faceCuts.Count < 3) continue;
 

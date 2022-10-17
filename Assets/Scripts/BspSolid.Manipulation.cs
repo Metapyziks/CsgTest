@@ -17,7 +17,8 @@ namespace CsgTest
 
     partial class BspSolid
     {
-        public const float Epsilon = 0.000001f;
+        public const float UnitEpsilon = 0.000001f;
+        public const float DistanceEpsilon = 0.001f;
 
         public void Cut(BspPlane plane)
         {
