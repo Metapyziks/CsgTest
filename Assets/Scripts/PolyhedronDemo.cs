@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using JetBrains.Annotations;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -13,6 +14,7 @@ namespace CsgTest
     {
         private readonly List<ConvexPolyhedron> _polyhedra = new List<ConvexPolyhedron>();
 
+        private int _geometryHash;
         private bool _geometryInvalid;
         private bool _meshInvalid;
 
@@ -22,9 +24,13 @@ namespace CsgTest
         private ushort[] _indices;
         private Mesh _mesh;
 
+        private readonly HashSet<ConvexPolyhedron> _zombies = new HashSet<ConvexPolyhedron>();
+
         private bool _hasRigidBody;
 
         public Vector3 GridSize;
+
+        public int DebugIndex;
 
         void Start()
         {
@@ -44,6 +50,8 @@ namespace CsgTest
 
                 var min = math.dot( poly.VertexMin, axis );
                 var max = math.dot( poly.VertexMax, axis );
+
+                if ( max - min <= gridSize ) continue;
 
                 var minGrid = Mathf.FloorToInt(min / gridSize) + 1;
                 var maxGrid = Mathf.CeilToInt(max / gridSize) - 1;
@@ -91,9 +99,25 @@ namespace CsgTest
         void Update()
         {
 #if UNITY_EDITOR
-            if (!UnityEditor.EditorApplication.isPlaying)
+            if ( !UnityEditor.EditorApplication.isPlaying && !_geometryInvalid)
             {
-                _geometryInvalid = true;
+                var hash = 0;
+
+                foreach ( var brush in transform.GetComponentsInChildren<CsgBrush>() )
+                {
+                    unchecked
+                    {
+                        hash = (hash * 397) ^ brush.MaterialIndex;
+                        hash = (hash * 397) ^ brush.Operator.GetHashCode();
+                        hash = (hash * 397) ^ brush.Primitive.GetHashCode();
+                        hash = (hash * 397) ^ brush.transform.position.GetHashCode();
+                        hash = (hash * 397) ^ brush.transform.rotation.GetHashCode();
+                        hash = (hash * 397) ^ brush.transform.lossyScale.GetHashCode();
+                    }
+                }
+
+                _geometryInvalid |= hash != _geometryHash;
+                _geometryHash = hash;
             }
 #endif
 
@@ -144,6 +168,11 @@ namespace CsgTest
                         Combine(poly, brush.Operator);
                     }
                 }
+                
+                GetConnectivityContainers(out var chunks, out var visited, out var queue);
+                FindChunks(chunks, visited, queue);
+
+                Debug.Log($"Chunks: {chunks.Count}, zombies: {_zombies.Count}");
             }
 
             if (_meshInvalid)
@@ -239,38 +268,22 @@ namespace CsgTest
         [ThreadStatic] private static List<(ConvexPolyhedron, float)> _sChunks;
         [ThreadStatic] private static HashSet<ConvexPolyhedron> _sVisited;
         [ThreadStatic] private static Queue<ConvexPolyhedron> _sVisitQueue;
-
-        private static List<(ConvexPolyhedron Root, float Volume)> GetChunkList()
+        
+        private static void GetConnectivityContainers( out List<(ConvexPolyhedron Root, float Volume)> chunks,
+            out HashSet<ConvexPolyhedron> visited, out Queue<ConvexPolyhedron> queue )
         {
-            var list = _sChunks ?? (_sChunks = new List<(ConvexPolyhedron, float)>());
-            list.Clear();
-
-            return list;
-        }
-
-        private static HashSet<ConvexPolyhedron> GetVisitedSet()
-        {
-            var set = _sVisited ?? (_sVisited = new HashSet<ConvexPolyhedron>());
-            set.Clear();
-
-            return set;
-        }
-
-        private static Queue<ConvexPolyhedron> GetVisitedQueue()
-        {
-            var queue = _sVisitQueue ?? (_sVisitQueue = new Queue<ConvexPolyhedron>());
+            chunks = _sChunks ?? (_sChunks = new List<(ConvexPolyhedron, float)>());
+            visited = _sVisited ?? (_sVisited = new HashSet<ConvexPolyhedron>());
+            queue = _sVisitQueue ?? (_sVisitQueue = new Queue<ConvexPolyhedron>());
+            
+            chunks.Clear();
+            visited.Clear();
             queue.Clear();
-
-            return queue;
         }
 
-        private void RemoveDisconnectedPolyhedra()
+        private void FindChunks( List<(ConvexPolyhedron Root, float Volume)> chunks, HashSet<ConvexPolyhedron> visited, Queue<ConvexPolyhedron> queue )
         {
-            if (_polyhedra.Count == 0) return;
-
-            var chunks = GetChunkList();
-            var visited = GetVisitedSet();
-            var queue = GetVisitedQueue();
+            _zombies.Clear();
 
             while (visited.Count < _polyhedra.Count)
             {
@@ -292,18 +305,35 @@ namespace CsgTest
                 queue.Enqueue(root);
 
                 var volume = 0f;
+                var count = 0;
 
                 while (queue.Count > 0)
                 {
                     var next = queue.Dequeue();
 
+                    _zombies.Add( next );
+
                     volume += next.Volume;
+                    count += 1;
 
                     next.AddNeighbors(visited, queue);
                 }
 
                 chunks.Add((root, volume));
             }
+
+            foreach ( var poly in _polyhedra )
+            {
+                _zombies.Remove( poly );
+            }
+        }
+
+        private void RemoveDisconnectedPolyhedra()
+        {
+            if (_polyhedra.Count == 0) return;
+
+            GetConnectivityContainers( out var chunks, out var visited, out var queue );
+            FindChunks( chunks, visited, queue );
 
             if (chunks.Count == 1) return;
 
@@ -492,11 +522,12 @@ namespace CsgTest
 
             if (op == BrushOperator.Add)
             {
-                polyhedron = polyhedron.Clone();
                 _polyhedra.Add(polyhedron);
 
                 foreach (var intersection in _intersections)
                 {
+                    Debug.Log( intersection );
+
                     polyhedron.CopySubFaces(intersection);
                     intersection.Removed(polyhedron);
                 }
@@ -516,7 +547,16 @@ namespace CsgTest
 
             foreach (var poly in _polyhedra)
             {
-                poly.DrawGizmos();
+                // poly.DrawGizmos( poly.Index == DebugIndex );
+            }
+
+#if UNITY_EDITOR
+            UnityEditor.Handles.color = Color.red;
+#endif
+
+            foreach (var poly in _zombies)
+            {
+                poly.DrawGizmos(true, true);
             }
         }
     }

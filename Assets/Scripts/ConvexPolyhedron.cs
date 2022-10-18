@@ -883,14 +883,11 @@ namespace CsgTest
             return true;
         }
 
-        public void DrawGizmos()
+        public void DrawGizmos( bool drawFaces, bool isZombie = false )
         {
-            if ( Index == 1 )
+            foreach (var face in _faces)
             {
-                foreach (var face in _faces)
-                {
-                    face.DrawGizmos();
-                }
+                face.DrawGizmos( VertexAverage, drawFaces, isZombie);
             }
 
 #if UNITY_EDITOR
@@ -955,18 +952,29 @@ namespace CsgTest
             return Plane.GetHashCode();
         }
 
-        public void DrawGizmos()
+        public void DrawGizmos( float3 vertexAverage, bool drawFaces, bool isZombie )
         {
             var basis = Plane.GetBasis();
 
             foreach ( var subFace in SubFaces )
             {
-                foreach (var cut in subFace.FaceCuts)
+                if ( drawFaces )
                 {
-                    var min = cut.GetPoint(basis, cut.Min);
-                    var max = cut.GetPoint(basis, cut.Max);
+                    Gizmos.color = isZombie ? Color.red : Color.white;
 
-                    Gizmos.DrawLine(min, max);
+                    foreach (var cut in subFace.FaceCuts)
+                    {
+                        var min = cut.GetPoint(basis, cut.Min);
+                        var max = cut.GetPoint(basis, cut.Max);
+
+                        Gizmos.DrawLine(min, max );
+                    }
+                }
+
+                if ( subFace.Neighbor != null )
+                {
+                    Gizmos.color = isZombie ? Color.yellow : Color.green;
+                    Gizmos.DrawLine(vertexAverage, subFace.Neighbor.VertexAverage );
                 }
             }
         }
