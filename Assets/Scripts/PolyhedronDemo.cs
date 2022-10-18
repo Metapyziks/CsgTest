@@ -24,10 +24,68 @@ namespace CsgTest
 
         private bool _hasRigidBody;
 
+        public Vector3 GridSize;
+
         void Start()
         {
             _hasRigidBody = GetComponent<Rigidbody>() != null;
             _geometryInvalid = _polyhedra.Count == 0;
+        }
+
+        private void SubdivideGridAxis( float3 axis, List<ConvexPolyhedron> polys )
+        {
+            var gridSize = math.dot( axis, GridSize );
+
+            if (gridSize <= 0f ) return;
+            
+            for (var i = polys.Count - 1; i >= 0; i--)
+            {
+                var poly = polys[i];
+
+                var min = math.dot( poly.VertexMin, axis );
+                var max = math.dot( poly.VertexMax, axis );
+
+                var minGrid = Mathf.FloorToInt(min / gridSize) + 1;
+                var maxGrid = Mathf.CeilToInt(max / gridSize) - 1;
+
+                for (var grid = minGrid; grid <= maxGrid; grid++)
+                {
+                    var plane = new BspPlane(axis, grid * gridSize);
+
+                    _excludedFaces.Clear();
+                    var (excludedNone, excludedAll) = poly.Clip(plane, null, null, _excludedFaces, dryRun: true);
+
+                    if (excludedNone)
+                    {
+                        continue;
+                    }
+
+                    if (excludedAll)
+                    {
+                        break;
+                    }
+
+                    var child = new ConvexPolyhedron
+                    {
+                        MaterialIndex = poly.MaterialIndex
+                    };
+
+                    child.CopyFaces(_excludedFaces);
+
+                    poly.Clip(plane, null, child);
+                    child.Clip(-plane, null, poly);
+
+                    if (!child.IsEmpty)
+                    {
+                        polys.Add(child);
+                    }
+                    else
+                    {
+                        Debug.LogError("Empty child!");
+                        child.Removed(null);
+                    }
+                }
+            }
         }
 
         void Update()
@@ -75,7 +133,14 @@ namespace CsgTest
                     {
                         poly.MaterialIndex = brush.MaterialIndex;
                         poly.Transform(matrix);
+                    }
 
+                    SubdivideGridAxis( new float3( 1f, 0f, 0f ), polys );
+                    SubdivideGridAxis( new float3( 0f, 0f, 1f ), polys );
+                    SubdivideGridAxis( new float3( 0f, 1f, 0f ), polys );
+
+                    foreach ( var poly in polys )
+                    {
                         Combine(poly, brush.Operator);
                     }
                 }
