@@ -366,7 +366,7 @@ namespace CsgTest
                 Collider = null;
             }
         }
-
+        
         internal void ReplaceNeighbor(BspPlane plane, ConvexPolyhedron neighbor, ConvexPolyhedron newNeighbor)
         {
             foreach (var face in _faces)
@@ -507,7 +507,7 @@ namespace CsgTest
             }
         }
 
-        private bool TryGetFace(BspPlane plane, out ConvexFace matchingFace)
+        internal bool TryGetFace(BspPlane plane, out ConvexFace matchingFace)
         {
             foreach (var face in _faces)
             {
@@ -520,6 +520,42 @@ namespace CsgTest
 
             matchingFace = default;
             return false;
+        }
+
+        internal void SetNeighbor( ConvexFace face, List<FaceCut> invFaceCuts, ConvexPolyhedron neighbor )
+        {
+            var oldBasis = (-face.Plane).GetBasis();
+            var newBasis = face.Plane.GetBasis();
+
+            for (var i = face.SubFaces.Count - 1; i >= 0; --i)
+            {
+                var subFace = face.SubFaces[i];
+                var allInside = true;
+
+                foreach (var invFaceCut in invFaceCuts)
+                {
+                    var faceCut = -invFaceCut.Transform( float4x4.identity, oldBasis, newBasis );
+
+                    if (subFace.FaceCuts.Contains(faceCut))
+                    {
+                        continue;
+                    }
+
+                    var (excludeNone, excludeAll) = AddSubFaceCut(face, ref subFace, faceCut, subFace.Neighbor);
+
+                    if (excludeAll)
+                    {
+                        allInside = false;
+                        break;
+                    }
+                }
+
+                if (allInside)
+                {
+                    subFace.Neighbor = neighbor;
+                    face.SubFaces[i] = subFace;
+                }
+            }
         }
         
         internal void CopySubFaces(ConvexPolyhedron other)
@@ -849,7 +885,7 @@ namespace CsgTest
 
         public void DrawGizmos()
         {
-            if ( Index == 8 )
+            if ( Index == 1 )
             {
                 foreach (var face in _faces)
                 {

@@ -48,22 +48,24 @@ namespace CsgTest
 
                 _polyhedra.Clear();
 
+                var polys = new List<ConvexPolyhedron>();
+
                 foreach (var brush in transform.GetComponentsInChildren<CsgBrush>())
                 {
-                    ConvexPolyhedron[] polys = Array.Empty<ConvexPolyhedron>();
+                    polys.Clear();
 
                     switch (brush.Primitive)
                     {
                         case Primitive.Cube:
-                            polys = new[] { ConvexPolyhedron.CreateCube(new Bounds(Vector3.zero, Vector3.one)) };
+                            polys.Add( ConvexPolyhedron.CreateCube(new Bounds(Vector3.zero, Vector3.one)) );
                             break;
 
                         case Primitive.Dodecahedron:
-                            polys = new[] { ConvexPolyhedron.CreateDodecahedron(Vector3.zero, 0.5f) };
+                            polys.Add( ConvexPolyhedron.CreateDodecahedron( Vector3.zero, 0.5f ) );
                             break;
 
                         case Primitive.Mesh:
-                            polys = ConvexPolyhedron.CreateFromMesh(brush.GetComponent<MeshFilter>().sharedMesh);
+                            polys.AddRange( ConvexPolyhedron.CreateFromMesh( brush.GetComponent<MeshFilter>().sharedMesh ) );
                             break;
                     }
 
@@ -293,8 +295,6 @@ namespace CsgTest
             var changed = false;
             var maybeOutside = false;
 
-            var size = polyhedron.VertexMax - polyhedron.VertexMin;
-
             var min = polyhedron.VertexMin - BspSolid.DistanceEpsilon;
             var max = polyhedron.VertexMax + BspSolid.DistanceEpsilon;
 
@@ -322,6 +322,29 @@ namespace CsgTest
                 }
 
                 var allInside = true;
+
+                if ( op == BrushOperator.Add )
+                {
+                    // When adding, if two polyhedra are flush against eachother,
+                    // we need to make them neighbors
+
+                    for (var faceIndex = 0; faceIndex < polyhedron.FaceCount; ++faceIndex)
+                    {
+                        var face = polyhedron.GetFace(faceIndex);
+
+                        if (next.TryGetFace(-face.Plane, out var otherFace))
+                        {
+                            next.SetNeighbor(otherFace, face.FaceCuts, polyhedron);
+                            polyhedron.SetNeighbor(face, otherFace.FaceCuts, next);
+
+                            allInside = false;
+                            changed = true;
+                            break;
+                        }
+                    }
+                }
+
+                if ( !allInside ) continue;
 
                 for (var faceIndex = 0; faceIndex < polyhedron.FaceCount; ++faceIndex)
                 {
