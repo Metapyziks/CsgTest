@@ -380,8 +380,6 @@ namespace CsgTest
 
                     subFace.Neighbor = newNeighbor;
                     face.SubFaces[i] = subFace;
-
-                    return;
                 }
             }
         }
@@ -419,11 +417,6 @@ namespace CsgTest
 
             foreach (var face in _faces)
             {
-                if ( face.Plane.Normal.y <= -0.999f )
-                {
-                    Debug.Log( "Up!" );
-                }
-
                 var shouldPaint = false;
 
                 foreach ( var subFace in face.SubFaces )
@@ -562,42 +555,6 @@ namespace CsgTest
 
             matchingFace = default;
             return false;
-        }
-
-        internal void SetNeighbor( ConvexFace face, List<FaceCut> invFaceCuts, ConvexPolyhedron neighbor )
-        {
-            var oldBasis = (-face.Plane).GetBasis();
-            var newBasis = face.Plane.GetBasis();
-
-            for (var i = face.SubFaces.Count - 1; i >= 0; --i)
-            {
-                var subFace = face.SubFaces[i];
-                var allInside = true;
-
-                foreach (var invFaceCut in invFaceCuts)
-                {
-                    var faceCut = -invFaceCut.Transform( float4x4.identity, oldBasis, newBasis );
-
-                    if (subFace.FaceCuts.Contains(faceCut))
-                    {
-                        continue;
-                    }
-
-                    var (excludeNone, excludeAll) = AddSubFaceCut(face, ref subFace, faceCut, subFace.Neighbor);
-
-                    if (excludeAll)
-                    {
-                        allInside = false;
-                        break;
-                    }
-                }
-
-                if (allInside)
-                {
-                    subFace.Neighbor = neighbor;
-                    face.SubFaces[i] = subFace;
-                }
-            }
         }
         
         internal void CopySubFaces(ConvexPolyhedron other)
@@ -997,13 +954,15 @@ namespace CsgTest
 
         public void DrawGizmos( float3 vertexAverage, bool drawFaces, bool isZombie )
         {
+            const int debugZombie = 154;
+
             var basis = Plane.GetBasis();
 
             foreach ( var subFace in SubFaces )
             {
                 if ( drawFaces )
                 {
-                    Gizmos.color = isZombie || subFace.Neighbor?.Index == 2 ? Color.red : Color.white;
+                    Gizmos.color = isZombie || subFace.Neighbor?.Index == debugZombie ? Color.red : Color.white;
 
                     foreach (var cut in subFace.FaceCuts)
                     {
@@ -1019,7 +978,7 @@ namespace CsgTest
                     Gizmos.color = isZombie ? Color.yellow : Color.green;
                     Gizmos.DrawLine(vertexAverage, subFace.Neighbor.VertexAverage );
 
-                    if ( subFace.Neighbor.Index == 2 )
+                    if ( subFace.Neighbor.Index == debugZombie)
                     {
                         subFace.Neighbor.DrawGizmos( true, true );
                     }
