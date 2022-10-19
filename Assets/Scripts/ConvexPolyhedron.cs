@@ -742,33 +742,35 @@ namespace CsgTest
                     face.FaceCuts.AddFaceCut(planeCut);
                 }
 
-                if (!otherExclusions.ExcludesNone && !dryRun)
+                if ( dryRun || otherExclusions.ExcludesNone)
                 {
-                    other.FaceCuts.AddFaceCut(otherCut);
-                    other.FaceCuts.Sort(FaceCut.Comparer);
+                    continue;
+                }
 
-                    for (var subFaceIndex = other.SubFaces.Count - 1; subFaceIndex >= 0; --subFaceIndex)
+                other.FaceCuts.AddFaceCut(otherCut);
+                other.FaceCuts.Sort(FaceCut.Comparer);
+
+                for (var subFaceIndex = other.SubFaces.Count - 1; subFaceIndex >= 0; --subFaceIndex)
+                {
+                    var subFace = other.SubFaces[subFaceIndex];
+                    var subFaceExclusions = subFace.FaceCuts.GetNewFaceCutExclusions(otherCut);
+
+                    if (subFaceExclusions.ExcludesAll)
                     {
-                        var subFace = other.SubFaces[subFaceIndex];
-                        var subFaceExclusions = subFace.FaceCuts.GetNewFaceCutExclusions(otherCut);
-
-                        if (subFaceExclusions.ExcludesAll)
-                        {
-                            other.SubFaces.RemoveAt(subFaceIndex);
-                            subFace.Neighbor?.ReplaceNeighbor(-other.Plane, this, neighbor);
-                            continue;
-                        }
-
-                        if (subFaceExclusions.ExcludesNone)
-                        {
-                            continue;
-                        }
-
-                        subFace.FaceCuts.AddFaceCut(otherCut);
-                        subFace.FaceCuts.Sort(FaceCut.Comparer);
-
-                        subFace.Neighbor?.AddSubFaceCut(-other.Plane, this, neighbor, plane);
+                        other.SubFaces.RemoveAt(subFaceIndex);
+                        subFace.Neighbor?.ReplaceNeighbor(-other.Plane, this, neighbor);
+                        continue;
                     }
+
+                    if (subFaceExclusions.ExcludesNone)
+                    {
+                        continue;
+                    }
+
+                    subFace.FaceCuts.AddFaceCut(otherCut);
+                    subFace.FaceCuts.Sort(FaceCut.Comparer);
+
+                    subFace.Neighbor?.AddSubFaceCut(-other.Plane, this, neighbor, plane);
                 }
             }
 
@@ -787,22 +789,21 @@ namespace CsgTest
                 return (false, true);
             }
 
-            if (!dryRun)
+            if ( dryRun ) return (false, false);
+
+            face.FaceCuts.Sort(FaceCut.Comparer);
+
+            face.SubFaces = new List<SubFace>
             {
-                face.FaceCuts.Sort(FaceCut.Comparer);
-
-                face.SubFaces = new List<SubFace>
+                new SubFace
                 {
-                    new SubFace
-                    {
-                        Neighbor = neighbor,
-                        FaceCuts = new List<FaceCut>(face.FaceCuts)
-                    }
-                };
+                    Neighbor = neighbor,
+                    FaceCuts = new List<FaceCut>(face.FaceCuts)
+                }
+            };
 
-                _faces.Add(face);
-                InvalidateMesh();
-            }
+            _faces.Add(face);
+            InvalidateMesh();
 
             return (false, false);
         }
@@ -960,21 +961,26 @@ namespace CsgTest
             {
                 if ( drawFaces )
                 {
-                    Gizmos.color = isZombie ? Color.red : Color.white;
+                    Gizmos.color = isZombie || subFace.Neighbor?.Index == 2 ? Color.red : Color.white;
 
                     foreach (var cut in subFace.FaceCuts)
                     {
-                        var min = cut.GetPoint(basis, cut.Min);
-                        var max = cut.GetPoint(basis, cut.Max);
+                        var min = cut.GetPoint(basis, cut.Min) + Plane.Normal * 0.05f;
+                        var max = cut.GetPoint(basis, cut.Max) + Plane.Normal * 0.05f;
 
                         Gizmos.DrawLine(min, max );
                     }
                 }
 
-                if ( subFace.Neighbor != null )
+                if ( !isZombie && subFace.Neighbor != null )
                 {
                     Gizmos.color = isZombie ? Color.yellow : Color.green;
                     Gizmos.DrawLine(vertexAverage, subFace.Neighbor.VertexAverage );
+
+                    if ( subFace.Neighbor.Index == 2 )
+                    {
+                        subFace.Neighbor.DrawGizmos( true, true );
+                    }
                 }
             }
         }

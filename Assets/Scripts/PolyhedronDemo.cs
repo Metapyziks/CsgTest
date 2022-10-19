@@ -326,6 +326,11 @@ namespace CsgTest
             {
                 _zombies.Remove( poly );
             }
+            
+            if (_zombies.Count > 0)
+            {
+                Debug.LogError($"{_zombies.Count} Zombies!");
+            }
         }
 
         private void RemoveDisconnectedPolyhedra()
@@ -379,7 +384,7 @@ namespace CsgTest
         }
 
         private readonly HashSet<ConvexFace> _excludedFaces = new HashSet<ConvexFace>();
-
+        
         private readonly List<ConvexPolyhedron> _intersections =
             new List<ConvexPolyhedron>();
 
@@ -417,29 +422,6 @@ namespace CsgTest
                 }
 
                 var allInside = true;
-
-                if ( op == BrushOperator.Add )
-                {
-                    // When adding, if two polyhedra are flush against eachother,
-                    // we need to make them neighbors
-
-                    for (var faceIndex = 0; faceIndex < polyhedron.FaceCount; ++faceIndex)
-                    {
-                        var face = polyhedron.GetFace(faceIndex);
-
-                        if (next.TryGetFace(-face.Plane, out var otherFace))
-                        {
-                            next.SetNeighbor(otherFace, face.FaceCuts, polyhedron);
-                            polyhedron.SetNeighbor(face, otherFace.FaceCuts, next);
-
-                            allInside = false;
-                            changed = true;
-                            break;
-                        }
-                    }
-                }
-
-                if ( !allInside ) continue;
 
                 for (var faceIndex = 0; faceIndex < polyhedron.FaceCount; ++faceIndex)
                 {
@@ -498,7 +480,10 @@ namespace CsgTest
                     }
                 }
 
-                if (!allInside) continue;
+                if ( !allInside )
+                {
+                    continue;
+                }
 
                 switch (op)
                 {
@@ -523,13 +508,11 @@ namespace CsgTest
             if (op == BrushOperator.Add)
             {
                 _polyhedra.Add(polyhedron);
-
+                
                 foreach (var intersection in _intersections)
                 {
-                    Debug.Log( intersection );
-
                     polyhedron.CopySubFaces(intersection);
-                    intersection.Removed(polyhedron);
+                    intersection.Removed( polyhedron );
                 }
             }
 
@@ -547,7 +530,7 @@ namespace CsgTest
 
             foreach (var poly in _polyhedra)
             {
-                // poly.DrawGizmos( poly.Index == DebugIndex );
+                poly.DrawGizmos( poly.Index == DebugIndex );
             }
 
 #if UNITY_EDITOR
@@ -556,7 +539,7 @@ namespace CsgTest
 
             foreach (var poly in _zombies)
             {
-                poly.DrawGizmos(true, true);
+                poly.DrawGizmos(false, true);
             }
         }
     }
