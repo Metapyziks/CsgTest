@@ -410,11 +410,57 @@ namespace CsgTest
             }
         }
 
+        [ThreadStatic]
+        private static List<FaceCut> _sPaintCuts;
+
         public void PaintMaterial(ConvexPolyhedron poly)
         {
+            var paintCuts = _sPaintCuts ??= new List<FaceCut>();
+
             foreach (var face in _faces)
             {
+                if ( face.Plane.Normal.y <= -0.999f )
+                {
+                    Debug.Log( "Up!" );
+                }
+
+                var shouldPaint = false;
+
+                foreach ( var subFace in face.SubFaces )
+                {
+                    if ( subFace.Neighbor == null && (subFace.MaterialIndex ?? MaterialIndex) != poly.MaterialIndex )
+                    {
+                        shouldPaint = true;
+                        break;
+                    }
+                }
+
+                if ( !shouldPaint ) continue;
+                
+                paintCuts.Clear();
+                paintCuts.AddRange( face.FaceCuts );
+
                 var basis = face.Plane.GetBasis();
+
+                foreach ( var otherFace in poly._faces )
+                {
+                    var cutPlane = otherFace.Plane;
+
+                    if ( cutPlane.ApproxEquals( face.Plane ) )
+                    {
+                        continue;
+                    }
+
+                    var faceCut = Helpers.GetFaceCut( face.Plane, cutPlane, basis );
+                    paintCuts.AddFaceCut( faceCut );
+
+                    if ( paintCuts.Count == 0 )
+                    {
+                        break;
+                    }
+                }
+
+                if ( paintCuts.Count == 0 ) continue;
 
                 for (var i = face.SubFaces.Count - 1; i >= 0; --i)
                 {
@@ -426,15 +472,11 @@ namespace CsgTest
 
                     var allInside = true;
 
-                    foreach (var otherFace in poly._faces)
+                    foreach ( var paintCut in paintCuts )
                     {
-                        var cutPlane = otherFace.Plane;
+                        var (_, excludeAll) = AddSubFaceCut( face, ref subFace, paintCut, null );
 
-                        var faceCut = Helpers.GetFaceCut(face.Plane, cutPlane, basis);
-
-                        var (_, excludeAll) = AddSubFaceCut(face, ref subFace, faceCut, null);
-
-                        if (excludeAll)
+                        if ( excludeAll )
                         {
                             allInside = false;
                             break;

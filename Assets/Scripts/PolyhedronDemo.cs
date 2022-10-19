@@ -171,8 +171,6 @@ namespace CsgTest
                 
                 GetConnectivityContainers(out var chunks, out var visited, out var queue);
                 FindChunks(chunks, visited, queue);
-
-                Debug.Log($"Chunks: {chunks.Count}, zombies: {_zombies.Count}");
             }
 
             if (_meshInvalid)
