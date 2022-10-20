@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using CsgTest.Geometry;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -131,41 +132,6 @@ namespace CsgTest
             else if (Input.GetMouseButtonDown(0))
             {
                 Cursor.lockState = CursorLockMode.Locked;
-            }
-        }
-
-        private void Subtract()
-        {
-            var ray = new Ray(_eyes.position, _eyes.forward);
-            if (!Raycast(ray, out var hitInfo, 16f)) return;
-
-            var position = hitInfo.point;
-            var rotation = UnityEngine.Random.rotationUniform;
-            var localScale = new Vector3(UnityEngine.Random.value * 0.125f + 1f,
-                UnityEngine.Random.value * 0.125f + 1f,
-                UnityEngine.Random.value * 0.125f + 1f) * SubtractSize;
-            
-            var bspDemo = hitInfo.transform.GetComponent<BspDemo>();
-            if (bspDemo != null)
-            {
-                bspDemo.Subtract(float4x4.TRS(position, rotation, localScale));
-                bspDemo.LogInfo();
-            }
-
-            var polyDemo = hitInfo.transform.GetComponent<PolyhedronDemo>();
-
-            if (polyDemo != null)
-            {
-                var worldToLocal = polyDemo.transform.worldToLocalMatrix;
-
-                var mesh = ConvexPolyhedron.CreateDodecahedron(float3.zero, 0.5f);
-                mesh.MaterialIndex = 1;
-                mesh.Transform(math.mul(worldToLocal, float4x4.TRS(position, rotation, localScale * 1.1f)));
-                polyDemo.Combine(mesh, BrushOperator.Replace);
-
-                mesh = ConvexPolyhedron.CreateDodecahedron(float3.zero, 0.5f);
-                mesh.Transform(math.mul(worldToLocal, float4x4.TRS(position, rotation, localScale)));
-                polyDemo.Combine(mesh, BrushOperator.Subtract);
             }
         }
 

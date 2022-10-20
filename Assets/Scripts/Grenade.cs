@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using CsgTest.Geometry;
 using Unity.Mathematics;
 using UnityEngine;
 using Random = UnityEngine.Random;
@@ -13,7 +14,7 @@ namespace CsgTest
 
         void OnCollisionEnter(Collision collision)
         {
-            var polyDemo = collision.gameObject.GetComponent<PolyhedronDemo>();
+            var polyDemo = collision.gameObject.GetComponent<CsgSolid>();
             if (polyDemo == null) return;
             
             var worldToLocal = polyDemo.transform.worldToLocalMatrix;
@@ -26,11 +27,11 @@ namespace CsgTest
             var randomA = new Unity.Mathematics.Random( (uint) new System.Random().Next() );
             var randomB = randomA;
 
-            var mesh = ConvexPolyhedron.CreateDodecahedron(float3.zero, 0.5f, ref randomA, 1f);
+            var mesh = CsgConvexSolid.CreateDodecahedron(float3.zero, 0.5f, ref randomA, 1f);
             mesh.Transform(math.mul(worldToLocal, float4x4.TRS(position, rotation, localScale)));
             polyDemo.Combine(mesh, BrushOperator.Subtract);
 
-            mesh = ConvexPolyhedron.CreateDodecahedron(float3.zero, 0.55f, ref randomB, 1f);
+            mesh = CsgConvexSolid.CreateDodecahedron(float3.zero, 0.55f, ref randomB, 1f);
             mesh.MaterialIndex = 1;
             mesh.Transform(math.mul(worldToLocal, float4x4.TRS(position, rotation, localScale)));
             polyDemo.Combine(mesh, BrushOperator.Paint);
