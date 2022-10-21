@@ -64,8 +64,8 @@ namespace CsgTest.Geometry
                 avgPos /= faceCuts.Count;
 
                 scale *= Mathf.Sqrt( totalLength / 16f );
-                
-                var arrowCount = Mathf.Floor( totalLength / (16f * scale) );
+
+                var arrowCount = Math.Max( 1, Mathf.Floor( totalLength / (16f * scale) ) );
                 var arrowGap = totalLength / arrowCount;
 
                 var time = DateTime.UtcNow;

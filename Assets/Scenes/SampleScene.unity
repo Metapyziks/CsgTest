@@ -1440,7 +1440,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 089209ac2e5d1c94cbbdc822fddc8511, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  DebugIndex: 4
+  DebugIndex: 69
 --- !u!33 &1313502517
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -1771,7 +1771,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &1929898071
 Transform:
   m_ObjectHideFlags: 0
@@ -1779,8 +1779,8 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1929898070}
-  m_LocalRotation: {x: -0.34561375, y: -0.85107577, z: -0.22372799, w: 0.32583275}
-  m_LocalPosition: {x: -3.6, y: 23.16, z: 9.48}
+  m_LocalRotation: {x: -0.50863147, y: -0.12496948, z: 0.3421209, w: -0.7801474}
+  m_LocalPosition: {x: 16.11, y: 17.63, z: -3.17}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 522695883}
@@ -1798,7 +1798,7 @@ Transform:
   - {fileID: 1371412799}
   m_Father: {fileID: 1313502518}
   m_RootOrder: 3
-  m_LocalEulerAnglesHint: {x: -37.304, y: -869.812, z: 33.8}
+  m_LocalEulerAnglesHint: {x: 61.537, y: -378.73, z: -58.574}
 --- !u!1 &1940768435
 GameObject:
   m_ObjectHideFlags: 0
@@ -1861,7 +1861,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &1982145905
 Transform:
   m_ObjectHideFlags: 0
@@ -1869,13 +1869,13 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1982145904}
-  m_LocalRotation: {x: -0.6238987, y: -0.16917726, z: -0.5422528, w: 0.53674155}
-  m_LocalPosition: {x: -0.677, y: 14.458, z: -1.002}
-  m_LocalScale: {x: 6, y: 6, z: 6}
+  m_LocalRotation: {x: -0.40502298, y: -0.6423671, z: -0.43721354, w: 0.48183522}
+  m_LocalPosition: {x: 8.44, y: 15.76, z: 0.11}
+  m_LocalScale: {x: 1, y: 6, z: 1}
   m_Children: []
   m_Father: {fileID: 1313502518}
   m_RootOrder: 7
-  m_LocalEulerAnglesHint: {x: -58.563, y: 71.643, z: -134.656}
+  m_LocalEulerAnglesHint: {x: -72.178, y: -120.071, z: 18.876}
 --- !u!114 &1982145906
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1889,7 +1889,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   Operator: 0
-  Primitive: 1
+  Primitive: 0
   MaterialIndex: 0
 --- !u!1 &2140625796
 GameObject:

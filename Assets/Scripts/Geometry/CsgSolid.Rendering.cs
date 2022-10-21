@@ -40,7 +40,7 @@ namespace CsgTest.Geometry
                     return;
                 }
 
-                // RemoveDisconnectedPolyhedra();
+                RemoveDisconnectedPolyhedra();
             }
 
             if (_mesh == null)

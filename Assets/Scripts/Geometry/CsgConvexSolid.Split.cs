@@ -20,14 +20,7 @@ namespace CsgTest.Geometry
         /// <returns>If a split occurred, returns a new solid with the removed faces. Otherwise null.</returns>
         public CsgConvexSolid Split( CsgPlane plane, List<FaceCut> faceCuts = null )
         {
-            var result = Split( plane, faceCuts, false );
-
-            if ( result.Changed )
-            {
-                InvalidateMesh();
-            }
-
-            return result.NegativeSolid;
+            return Split( plane, faceCuts, false ).NegativeSolid;
         }
 
         /// <summary>
@@ -38,15 +31,7 @@ namespace CsgTest.Geometry
         /// <returns>Returns true if a clip occurred.</returns>
         public bool Clip( CsgPlane plane, List<FaceCut> faceCuts = null )
         {
-            var result = Split( plane, faceCuts, true );
-
-            if ( result.Changed )
-            {
-                InvalidateMesh();
-                result.NegativeSolid?.InvalidateMesh();
-            }
-
-            return result.Changed;
+            return Split( plane, faceCuts, true ).Changed;
         }
         
         private (bool Changed, CsgConvexSolid NegativeSolid) Split( CsgPlane cutPlane, List<FaceCut> faceCuts, bool discard )
@@ -223,6 +208,9 @@ namespace CsgTest.Geometry
                 _faces.Add( posSplitFace );
                 negSolid?._faces.Add( posSplitFace.CloneFlipped( this ) );
 
+                InvalidateMesh();
+                negSolid?.InvalidateMesh();
+
                 return (true, negSolid);
             }
             finally
@@ -246,6 +234,12 @@ namespace CsgTest.Geometry
             IsEmpty = true;
 
             InvalidateMesh();
+
+            if ( Collider != null )
+            {
+                UnityEngine.Object.Destroy( Collider );
+                Collider = null;
+            }
         }
 
         private void ReplaceNeighbor( CsgPlane plane, CsgConvexSolid oldNeighbor, CsgConvexSolid newNeighbor )

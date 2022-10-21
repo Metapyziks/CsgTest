@@ -23,8 +23,8 @@ namespace CsgTest.Geometry
 
         void Start()
         {
-            _geometryInvalid = true;
             RenderingStart();
+            _geometryInvalid = transform.GetComponentsInChildren<CsgBrush>().Length > 0;
         }
 
         void OnValidate()
