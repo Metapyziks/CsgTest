@@ -20,12 +20,6 @@ namespace CsgTest.Geometry
                 return false;
             }
 
-            if ( op == BrushOperator.Replace )
-            {
-                // TODO
-                return false;
-            }
-
             var min = solid.VertexMin - CsgHelpers.DistanceEpsilon;
             var max = solid.VertexMax + CsgHelpers.DistanceEpsilon;
 
@@ -46,6 +40,17 @@ namespace CsgTest.Geometry
 
                 if ( nextMin.x > max.x || nextMin.y > max.y || nextMin.z > max.z ) continue;
                 if ( nextMax.x < min.x || nextMax.y < min.y || nextMax.z < min.z ) continue;
+
+                var skip = false;
+
+                switch ( op )
+                {
+                    case BrushOperator.Replace:
+                        skip = next.MaterialIndex == solid.MaterialIndex;
+                        break;
+                }
+
+                if ( skip ) continue;
 
                 var faces = solid.Faces;
 
@@ -68,20 +73,33 @@ namespace CsgTest.Geometry
 
                 // next will now contain only the intersection with solid.
                 // We'll copy its faces and remove it
+                
+                switch ( op )
+                {
+                    case BrushOperator.Replace:
+                        next.MaterialIndex = solid.MaterialIndex;
+                        break;
 
-                _polyhedra.RemoveAt( polyIndex );
+                    case BrushOperator.Add:
+                        _polyhedra.RemoveAt( polyIndex );
 
-                solid.MergeSubFacesFrom( next );
-                next.Remove( null );
+                        solid.MergeSubFacesFrom( next );
+                        next.Remove( null );
+                        break;
+
+                    case BrushOperator.Subtract:
+                        _polyhedra.RemoveAt( polyIndex );
+
+                        next.Remove( null );
+                        break;
+                }
             }
 
-            if ( op == BrushOperator.Add )
+            switch ( op )
             {
-                _polyhedra.Add( solid );
-            }
-            else
-            {
-                solid.Remove( null );
+                case BrushOperator.Add:
+                    _polyhedra.Add( solid );
+                    break;
             }
 
             _meshInvalid |= changed;
