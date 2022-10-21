@@ -79,10 +79,6 @@ namespace CsgTest.Geometry
         {
             return a.x * b.y - a.y * b.x;
         }
-        public static void Flip( this List<CsgConvexSolid.FaceCut> faceCuts, CsgPlane plane )
-        {
-            Flip( faceCuts, plane.GetHelper(), (-plane).GetHelper() );
-        }
 
         public static void Flip( this List<CsgConvexSolid.FaceCut> faceCuts,
             in CsgPlane.Helper oldHelper, in CsgPlane.Helper newHelper )

@@ -64,6 +64,11 @@ namespace CsgTest.Geometry
                     splitFaceCuts.Split( splitPlaneHelper.GetCut( face.Plane ) );
                 }
 
+                if ( faceCuts != null && splitFaceCuts.IsDegenerate() )
+                {
+                    return (false, null);
+                }
+
                 if ( GetSign( splitPlaneHelper.GetAveragePos( splitFaceCuts ) ) < 0 )
                 {
                     return (false, null);
