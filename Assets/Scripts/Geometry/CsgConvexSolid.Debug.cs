@@ -10,11 +10,11 @@ namespace CsgTest.Geometry
 {
     partial class CsgConvexSolid
     {
-        public void DrawGizmos( bool drawFaces, bool isZombie = false )
+        public void DrawGizmos( bool drawFaces )
         {
             foreach (var face in _faces)
             {
-                face.DrawGizmos(VertexAverage, drawFaces, isZombie);
+                face.DrawGizmos(VertexAverage, drawFaces);
             }
 
 #if UNITY_EDITOR
@@ -37,40 +37,58 @@ namespace CsgTest.Geometry
 
         partial struct Face
         {
-            public void DrawGizmos( float3 vertexAverage, bool drawFaces, bool isZombie )
+            private static void DrawFaceGizmos( List<FaceCut> faceCuts, in CsgPlane.Helper helper, float scale )
+            {
+                var arrowGap = 16f * scale;
+
+                var t = (-1f + DateTime.UtcNow.Millisecond / 1000f) * arrowGap;
+
+                foreach ( var cut in faceCuts )
+                {
+                    var min = helper.GetPoint( cut, cut.Min );
+                    var max = helper.GetPoint( cut, cut.Max );
+
+                    Gizmos.DrawLine( min, max );
+
+                    var tangent = math.normalizesafe( max - min );
+                    var normal = math.cross( tangent, helper.Normal );
+
+                    var l = math.length( max - min );
+
+                    t += l;
+
+                    while ( t > 0f )
+                    {
+                        var mid = math.lerp( min, max, t / l );
+                        var size = math.clamp( math.min( t, l - t ), 0f, 1f ) * scale;
+
+                        Gizmos.DrawLine( mid + tangent * size, mid - normal * size );
+                        Gizmos.DrawLine( mid, mid - normal * size );
+
+                        t -= arrowGap;
+                    }
+
+                }
+            }
+
+            public void DrawGizmos( float3 vertexAverage, bool drawFaces )
             {
                 const int debugZombie = 154;
 
                 var basis = Plane.GetHelper();
+                
+                if ( drawFaces )
+                {
+                    Gizmos.color = Color.white;
+                    DrawFaceGizmos( FaceCuts, basis, 1f );
+                }
 
                 foreach (var subFace in SubFaces)
                 {
                     if (drawFaces)
                     {
-                        Gizmos.color = isZombie || subFace.Neighbor?.Index == debugZombie ? Color.red : Color.white;
-
-                        foreach (var cut in subFace.FaceCuts)
-                        {
-                            var min = basis.GetPoint(cut, cut.Min);
-                            var max = basis.GetPoint(cut, cut.Max);
-
-                            Gizmos.DrawLine(min, max);
-
-                            var mid = (min + max) * 0.5f;
-
-                            Gizmos.DrawLine( mid, mid - Plane.Normal );
-                        }
-                    }
-
-                    if (!isZombie && subFace.Neighbor != null)
-                    {
-                        Gizmos.color = isZombie ? Color.yellow : Color.green;
-                        Gizmos.DrawLine(vertexAverage, subFace.Neighbor.VertexAverage);
-
-                        if (subFace.Neighbor.Index == debugZombie)
-                        {
-                            subFace.Neighbor.DrawGizmos(true, true);
-                        }
+                        Gizmos.color = new Color( 0f, 1f, 0f, 0.5f );
+                        DrawFaceGizmos( subFace.FaceCuts, basis, 0.5f );
                     }
                 }
             }

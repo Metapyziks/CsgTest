@@ -23,13 +23,25 @@ namespace CsgTest.Geometry
 
         void Start()
         {
+            _geometryInvalid = true;
             RenderingStart();
+        }
+
+        void OnValidate()
+        {
+#if UNITY_EDITOR
+            if ( !UnityEditor.EditorApplication.isPlaying )
+            {
+                _geometryHash = 0;
+                _geometryInvalid = true;
+            }
+#endif
         }
 
         void Update()
         {
 #if UNITY_EDITOR
-            if (!UnityEditor.EditorApplication.isPlaying && !_geometryInvalid)
+            if (!UnityEditor.EditorApplication.isPlaying)
             {
                 var hash = 0;
 
