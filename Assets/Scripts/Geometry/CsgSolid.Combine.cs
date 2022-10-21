@@ -50,17 +50,14 @@ namespace CsgTest.Geometry
                     changed = true;
 
                     _polyhedra.Add( child );
-
-                    if (next.IsEmpty)
-                    {
-                        _polyhedra.RemoveAt(polyIndex);
-                        break;
-                    }
                 }
 
                 if ( !next.IsEmpty && !solid.Contains( next.VertexAverage ) ) continue;
 
-                _polyhedra.RemoveAt(polyIndex);
+                // next will now contain only the intersection with solid.
+                // We'll copy its faces and remove it
+
+                _polyhedra.RemoveAt( polyIndex );
 
                 solid.MergeSubFacesFrom( next );
             }
@@ -68,6 +65,10 @@ namespace CsgTest.Geometry
             if ( op == BrushOperator.Add )
             {
                 _polyhedra.Add( solid );
+            }
+            else
+            {
+                solid.RemoveFromNeighbors( null );
             }
 
             _meshInvalid |= changed;

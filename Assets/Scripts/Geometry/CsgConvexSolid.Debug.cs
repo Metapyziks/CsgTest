@@ -41,9 +41,11 @@ namespace CsgTest.Geometry
 
         partial struct Face
         {
-            private static void DrawFaceGizmos( List<FaceCut> faceCuts, in CsgPlane.Helper helper, float scale )
+            private static void DrawFaceGizmos( List<FaceCut> faceCuts, in CsgPlane.Helper helper, float scale, CsgConvexSolid neighbor = null )
             {
                 var totalLength = 0f;
+
+                var avgPos = float3.zero;
 
                 faceCuts.Sort( FaceCut.Comparer );
 
@@ -52,9 +54,18 @@ namespace CsgTest.Geometry
                     var min = helper.GetPoint( cut, cut.Min );
                     var max = helper.GetPoint( cut, cut.Max );
 
+                    avgPos += max;
+
                     Gizmos.DrawLine( min, max );
 
                     totalLength += math.length( max - min );
+                }
+
+                avgPos /= faceCuts.Count;
+
+                if ( neighbor != null )
+                {
+                    Gizmos.DrawLine( avgPos, neighbor.VertexAverage );
                 }
 
                 scale *= Mathf.Sqrt( totalLength / 16f );
@@ -62,7 +73,9 @@ namespace CsgTest.Geometry
                 var arrowCount = Mathf.Floor( totalLength / (16f * scale) );
                 var arrowGap = totalLength / arrowCount;
 
-                var t = (-1f + DateTime.UtcNow.Millisecond / 1000f) * arrowGap;
+                var time = DateTime.UtcNow;
+
+                var t = (-1f + (time.Millisecond / 1000f + time.Second % 2) * 0.5f) * arrowGap;
 
                 foreach ( var cut in faceCuts )
                 {
@@ -106,7 +119,7 @@ namespace CsgTest.Geometry
                     if (drawFaces)
                     {
                         Gizmos.color = new Color( 0f, 1f, 0f, 0.5f );
-                        DrawFaceGizmos( subFace.FaceCuts, basis, 0.5f );
+                        DrawFaceGizmos( subFace.FaceCuts, basis, 0.5f, subFace.Neighbor );
                     }
                 }
             }

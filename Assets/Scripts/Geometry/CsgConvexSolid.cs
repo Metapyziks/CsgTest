@@ -97,7 +97,7 @@ namespace CsgTest.Geometry
 
         private void SetEmpty()
         {
-            // Removed(null);
+            RemoveFromNeighbors( null );
 
             _faces.Clear();
             IsEmpty = true;
