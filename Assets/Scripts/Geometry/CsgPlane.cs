@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Codice.CM.WorkspaceServer.DataStore.IncomingChanges;
 using Unity.Mathematics;
 using UnityEditor;
@@ -50,6 +51,13 @@ namespace CsgTest.Geometry
             var p2 = math.transform(matrix, basis.Origin + basis.Tv);
 
             return new CsgPlane(math.cross(p2 - position, p1 - position), position);
+        }
+
+        public int GetSign( float3 pos )
+        {
+            var dot = math.dot( pos, Normal ) - Offset;
+
+            return dot > CsgHelpers.DistanceEpsilon ? 1 : dot < -CsgHelpers.DistanceEpsilon ? -1 : 0;
         }
 
         public bool Equals( CsgPlane other )
@@ -131,16 +139,7 @@ namespace CsgTest.Geometry
 
             public float3 GetPoint( CsgConvexSolid.FaceCut cut )
             {
-                var minFinite = !float.IsNegativeInfinity(cut.Min);
-                var maxFinite = !float.IsPositiveInfinity(cut.Max);
-
-                return GetPoint(cut, minFinite && maxFinite
-                    ? (cut.Min + cut.Max) * 0.5f
-                    : minFinite
-                        ? cut.Min + 1f
-                        : maxFinite
-                            ? cut.Max - 1f
-                            : 0f);
+                return GetPoint( cut, cut.Mid );
             }
 
             public float3 GetPoint( CsgConvexSolid.FaceCut cut, float along )
@@ -150,6 +149,18 @@ namespace CsgTest.Geometry
                     float.IsPositiveInfinity(cut.Max) ? 1024f : cut.Max);
 
                 return Origin + Tu * pos.x + Tv * pos.y;
+            }
+
+            public float3 GetAveragePos( List<CsgConvexSolid.FaceCut> faceCuts )
+            {
+                if ( faceCuts.Count == 0 )
+                {
+                    return Normal * Offset;
+                }
+
+                var avgPos = faceCuts.GetAveragePos();
+
+                return Normal * Offset + Tu * avgPos.x + Tv * avgPos.y;
             }
 
             public CsgConvexSolid.FaceCut Transform( CsgConvexSolid.FaceCut cut, in Helper newHelper, float4x4? matrix = null )

@@ -95,19 +95,20 @@ namespace CsgTest.Geometry
             return copy;
         }
 
-        public bool Contains( float3 pos )
+        public int GetSign( float3 pos )
         {
-            if ( IsEmpty ) return false;
+            if ( IsEmpty ) return -1;
+
+            var sign = 1;
 
             foreach ( var face in _faces )
             {
-                if ( math.dot( pos, face.Plane.Normal ) - face.Plane.Offset < -CsgHelpers.DistanceEpsilon )
-                {
-                    return false;
-                }
+                sign = Math.Min( sign, face.Plane.GetSign( pos ) );
+
+                if ( sign == -1 ) break;
             }
 
-            return true;
+            return sign;
         }
 
         public bool TryGetFace( CsgPlane plane, out Face face )

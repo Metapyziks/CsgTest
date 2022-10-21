@@ -54,41 +54,34 @@ namespace CsgTest.Geometry
             if ( IsEmpty ) return (false, null);
 
             var splitPlaneHelper = cutPlane.GetHelper();
-
-            var intersectionCuts = CsgHelpers.RentFaceCutList();
-
-            var posCuts = CsgHelpers.RentFaceCutList();
+            
+            var splitFaceCuts = CsgHelpers.RentFaceCutList();
             var negCuts = CsgHelpers.RentFaceCutList();
 
             try
             {
-                intersectionCuts.Clear();
+                splitFaceCuts.Clear();
 
                 if ( faceCuts != null )
                 {
-                    intersectionCuts.AddRange( faceCuts );
+                    splitFaceCuts.AddRange( faceCuts );
                 }
 
                 // Cut down split face to see if there is any intersection
 
                 foreach ( var face in _faces )
                 {
-                    var splitPlaneCut = splitPlaneHelper.GetCut( face.Plane );
-                    intersectionCuts.Split( splitPlaneCut, posCuts, negCuts );
-
-                    if ( negCuts.Count == 0 )
+                    if ( face.Plane.ApproxEquals( cutPlane ) || face.Plane.ApproxEquals( -cutPlane ) )
                     {
-                        continue;
-                    }
-
-                    if ( posCuts.Count == 0 )
-                    {
-                        // Bounded cut plane is fully outside of this solid
-
                         return (false, null);
                     }
 
-                    (intersectionCuts, posCuts) = (posCuts, intersectionCuts);
+                    splitFaceCuts.Split( splitPlaneHelper.GetCut( face.Plane ) );
+                }
+
+                if ( GetSign( splitPlaneHelper.GetAveragePos( splitFaceCuts ) ) < 0 )
+                {
+                    return (false, null);
                 }
 
                 // If we survived that, the cut plane must intersect this solid
@@ -102,13 +95,13 @@ namespace CsgTest.Geometry
 
                 var posSubFace = new SubFace
                 {
-                    FaceCuts = new List<FaceCut>( intersectionCuts ),
+                    FaceCuts = new List<FaceCut>( splitFaceCuts ),
                     Neighbor = negSolid
                 };
 
                 if ( faceCuts != null )
                 {
-                    intersectionCuts.Clear();
+                    splitFaceCuts.Clear();
                 }
 
                 for ( var i = _faces.Count - 1; i >= 0; i-- )
@@ -119,16 +112,8 @@ namespace CsgTest.Geometry
                     {
                         // Cut unbounded split plane to find shared split face.
                         // If faceCuts == null, we've already found it (posSubFace will be the whole face)
-
-                        var splitPlaneCut = splitPlaneHelper.GetCut( face.Plane );
-                        intersectionCuts.Split( splitPlaneCut, posCuts, negCuts );
-
-                        if ( negCuts.Count != 0 )
-                        {
-                            Assert.IsFalse( posCuts.Count == 0 );
-
-                            (intersectionCuts, posCuts) = (posCuts, intersectionCuts);
-                        }
+                        
+                        splitFaceCuts.Split( splitPlaneHelper.GetCut( face.Plane ) );
                     }
 
                     // Cut original face
@@ -136,17 +121,17 @@ namespace CsgTest.Geometry
                     var facePlaneHelper = face.Plane.GetHelper();
                     var facePlaneCut = facePlaneHelper.GetCut( cutPlane );
 
-                    face.FaceCuts.Split( facePlaneCut, posCuts, negCuts );
-
-                    // Check if face is all on positive or negative side
-
-                    if ( negCuts.Count == 0 )
+                    if ( !face.FaceCuts.Split( facePlaneCut, negCuts ) )
                     {
-                        continue;
-                    }
+                        // Face isn't split by cut plane, so check which side it's on
 
-                    if ( posCuts.Count == 0 )
-                    {
+                        if ( cutPlane.GetSign( facePlaneHelper.GetAveragePos( face.FaceCuts ) ) >= 0 )
+                        {
+                            continue;
+                        }
+
+                        // Negative side
+
                         _faces.RemoveAt( i );
                         negSolid?._faces.Add( face );
 
@@ -157,13 +142,13 @@ namespace CsgTest.Geometry
 
                         continue;
                     }
-
+                    
                     // Otherwise split face in two
 
                     var posFace = new Face
                     {
                         Plane = face.Plane,
-                        FaceCuts = new List<FaceCut>( posCuts ),
+                        FaceCuts = face.FaceCuts,
                         SubFaces = new List<SubFace>()
                     };
 
@@ -181,32 +166,25 @@ namespace CsgTest.Geometry
 
                     foreach ( var subFace in face.SubFaces )
                     {
-                        subFace.FaceCuts.Split( facePlaneCut, posCuts, negCuts );
-
-                        // Check if sub-face is all on positive or negative side
-
-                        if ( negCuts.Count == 0 )
+                        if ( !subFace.FaceCuts.Split( facePlaneCut, negCuts ) )
                         {
-                            posFace.SubFaces.Add( subFace );
-                            continue;
-                        }
+                            // Face isn't split by cut plane, so check which side it's on
 
-                        if ( posCuts.Count == 0 )
-                        {
+                            if ( cutPlane.GetSign( facePlaneHelper.GetAveragePos( subFace.FaceCuts ) ) >= 0 )
+                            {
+                                posFace.SubFaces.Add( subFace );
+                                continue;
+                            }
+
                             negFace?.SubFaces.Add( subFace );
 
                             subFace.Neighbor?.ReplaceNeighbor( -face.Plane, this, negSolid, -cutPlane );
                             continue;
                         }
-
+                        
                         // Otherwise split sub-face in two
 
-                        posFace.SubFaces.Add( new SubFace
-                        {
-                            FaceCuts = new List<FaceCut>( posCuts ),
-                            MaterialIndex = subFace.MaterialIndex,
-                            Neighbor = subFace.Neighbor
-                        } );
+                        posFace.SubFaces.Add( subFace );
 
                         subFace.Neighbor?.ReplaceNeighbor( -face.Plane, this, negSolid, -cutPlane );
 
@@ -222,7 +200,7 @@ namespace CsgTest.Geometry
                 var posSplitFace = new Face
                 {
                     Plane = cutPlane,
-                    FaceCuts = new List<FaceCut>( intersectionCuts )
+                    FaceCuts = new List<FaceCut>( splitFaceCuts )
                 };
 
                 posSplitFace.SubFaces = new List<SubFace>
@@ -249,8 +227,7 @@ namespace CsgTest.Geometry
             }
             finally
             {
-                CsgHelpers.ReturnFaceCutList( intersectionCuts );
-                CsgHelpers.ReturnFaceCutList( posCuts );
+                CsgHelpers.ReturnFaceCutList( splitFaceCuts );
                 CsgHelpers.ReturnFaceCutList( negCuts );
             }
         }
@@ -293,8 +270,7 @@ namespace CsgTest.Geometry
             var helper = plane.GetHelper();
 
             var faceCut = helper.GetCut( cutPlane );
-
-            var posCuts = CsgHelpers.RentFaceCutList();
+            
             var negCuts = CsgHelpers.RentFaceCutList();
 
             try
@@ -305,24 +281,18 @@ namespace CsgTest.Geometry
 
                     if ( subFace.Neighbor != oldNeighbor ) continue;
 
-                    subFace.FaceCuts.Split( faceCut, posCuts, negCuts );
-
-                    if ( posCuts.Count == 0 )
+                    if ( subFace.FaceCuts.Split( faceCut, negCuts ) )
                     {
-                        continue;
-                    }
-
-                    if ( negCuts.Count > 0 )
-                    {
-                        subFace.FaceCuts.Clear();
-                        subFace.FaceCuts.AddRange( posCuts );
-
                         face.SubFaces.Add( new SubFace
                         {
                             FaceCuts = new List<FaceCut>( negCuts ),
                             MaterialIndex = subFace.MaterialIndex,
                             Neighbor = subFace.Neighbor
                         } );
+                    }
+                    else if ( cutPlane.GetSign( helper.GetAveragePos( subFace.FaceCuts ) ) < 0 )
+                    {
+                        continue;
                     }
                     
                     subFace.Neighbor = newNeighbor;
@@ -331,7 +301,6 @@ namespace CsgTest.Geometry
             }
             finally
             {
-                CsgHelpers.ReturnFaceCutList( posCuts );
                 CsgHelpers.ReturnFaceCutList( negCuts );
             }
         }

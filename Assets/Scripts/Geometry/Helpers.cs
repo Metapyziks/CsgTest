@@ -36,6 +36,8 @@ namespace CsgTest.Geometry
             var list = _sFaceCutListPool[_sFaceCutListPool.Count - 1];
             _sFaceCutListPool.RemoveAt( _sFaceCutListPool.Count - 1 );
 
+            list.Clear();
+
             return list;
         }
 
@@ -122,158 +124,138 @@ namespace CsgTest.Geometry
 
         public static float2 GetAveragePos( this List<CsgConvexSolid.FaceCut> faceCuts )
         {
-            Assert.IsTrue( faceCuts.Count >= 3 );
+            if ( faceCuts.Count == 0 )
+            {
+                return float2.zero;
+            }
 
             var avgPos = float2.zero;
 
             foreach ( var faceCut in faceCuts )
             {
-                Assert.IsFalse( float.IsNegativeInfinity( faceCut.Min ) );
-
-                avgPos += faceCut.GetPos( faceCut.Min );
+                avgPos += faceCut.GetPos( faceCut.Mid );
             }
 
             return avgPos / faceCuts.Count;
         }
 
-        public static void Split( this List<CsgConvexSolid.FaceCut> faceCuts, CsgConvexSolid.FaceCut splitCut,
-            List<CsgConvexSolid.FaceCut> outPositive, List<CsgConvexSolid.FaceCut> outNegative = null )
+        public static bool Split( this List<CsgConvexSolid.FaceCut> faceCuts, CsgConvexSolid.FaceCut splitCut, List<CsgConvexSolid.FaceCut> outNegative = null )
         {
-            outPositive.Clear();
             outNegative?.Clear();
 
-            if ( splitCut.ExcludesNone )
+            if ( splitCut.ExcludesNone || splitCut.ExcludesAll )
             {
-                outPositive.AddRange( faceCuts );
-                return;
+                return false;
             }
 
-            if ( splitCut.ExcludesAll )
-            {
-                outNegative?.AddRange( faceCuts );
-                return;
-            }
+            var outPositive = RentFaceCutList();
 
             var newCut = new CsgConvexSolid.FaceCut( splitCut.Normal, splitCut.Distance,
                 float.NegativeInfinity, float.PositiveInfinity );
 
-            foreach ( var faceCut in faceCuts )
+            try
             {
-                var cross = Cross( splitCut.Normal, faceCut.Normal );
-                var dot = math.dot( splitCut.Normal, faceCut.Normal );
-
-                if ( math.abs( cross ) <= UnitEpsilon )
+                foreach ( var faceCut in faceCuts )
                 {
-                    // Edge case: parallel cuts
+                    var cross = Cross( splitCut.Normal, faceCut.Normal );
+                    var dot = math.dot( splitCut.Normal, faceCut.Normal );
 
-                    if ( faceCut.Distance * dot - splitCut.Distance < DistanceEpsilon )
+                    if ( math.abs( cross ) <= UnitEpsilon )
                     {
-                        // splitCut is pointing away from faceCut,
-                        // so faceCut is negative
+                        // Edge case: parallel cuts
 
-                        if ( dot < 0f && splitCut.Distance * dot - faceCut.Distance < DistanceEpsilon )
+                        if ( faceCut.Distance * dot - splitCut.Distance < DistanceEpsilon )
                         {
-                            // faceCut is also pointing away from splitCut,
-                            // so the whole face must be negative
+                            // splitCut is pointing away from faceCut,
+                            // so faceCut is negative
 
-                            outPositive.Clear();
-                            outNegative?.Clear();
-                            outNegative?.AddRange( faceCuts );
-                            return;
+                            if ( dot < 0f && splitCut.Distance * dot - faceCut.Distance < DistanceEpsilon )
+                            {
+                                // faceCut is also pointing away from splitCut,
+                                // so the whole face must be negative
+
+                                outNegative?.Clear();
+                                return false;
+                            }
+
+                            outNegative?.Add( faceCut );
+                            continue;
                         }
 
-                        outNegative?.Add( faceCut );
+                        if ( splitCut.Distance * dot - faceCut.Distance < DistanceEpsilon )
+                        {
+                            // faceCut is pointing away from splitCut,
+                            // so splitCut is redundant
+
+                            outNegative?.Clear();
+                            return false;
+                        }
+
+                        // Otherwise the two cuts are pointing towards each other
+
+                        outPositive.Add( faceCut );
                         continue;
                     }
 
-                    if ( splitCut.Distance * dot - faceCut.Distance < DistanceEpsilon )
-                    {
-                        // faceCut is pointing away from splitCut,
-                        // so splitCut is redundant
+                    // Not parallel, so check for intersection
 
-                        outPositive.Clear();
-                        outNegative?.Clear();
-                        outPositive.AddRange( faceCuts );
-                        return;
+                    var proj0 = (faceCut.Distance - splitCut.Distance * dot) / cross;
+                    var proj1 = (splitCut.Distance - faceCut.Distance * dot) / -cross;
+
+                    var posFaceCut = faceCut;
+                    var negFaceCut = faceCut;
+
+                    if ( cross > 0f )
+                    {
+                        splitCut.Min = math.max( splitCut.Min, proj0 );
+                        newCut.Min = math.max( newCut.Min, proj0 );
+                        posFaceCut.Max = math.min( faceCut.Max, proj1 );
+                        negFaceCut.Min = math.max( faceCut.Min, proj1 );
+                    }
+                    else
+                    {
+                        splitCut.Max = math.min( splitCut.Max, proj0 );
+                        newCut.Max = math.min( newCut.Max, proj0 );
+                        posFaceCut.Min = math.max( faceCut.Min, proj1 );
+                        negFaceCut.Max = math.min( faceCut.Max, proj1 );
                     }
 
-                    // Otherwise the two cuts are pointing towards each other
+                    if ( splitCut.Max - splitCut.Min < DistanceEpsilon )
+                    {
+                        // splitCut must be fully outside the face
 
-                    outPositive.Add( faceCut );
-                    continue;
-                }
-
-                // Not parallel, so check for intersection
-
-                var proj0 = (faceCut.Distance - splitCut.Distance * dot) / cross;
-                var proj1 = (splitCut.Distance - faceCut.Distance * dot) / -cross;
-
-                var posFaceCut = faceCut;
-                var negFaceCut = faceCut;
-
-                if ( cross > 0f )
-                {
-                    splitCut.Min = math.max( splitCut.Min, proj0 );
-                    newCut.Min = math.max( newCut.Min, proj0 );
-                    posFaceCut.Max = math.min( faceCut.Max, proj1 );
-                    negFaceCut.Min = math.max( faceCut.Min, proj1 );
-                }
-                else
-                {
-                    splitCut.Max = math.min( splitCut.Max, proj0 );
-                    newCut.Max = math.min( newCut.Max, proj0 );
-                    posFaceCut.Min = math.max( faceCut.Min, proj1 );
-                    negFaceCut.Max = math.min( faceCut.Max, proj1 );
-                }
-
-                if ( splitCut.Max - splitCut.Min < DistanceEpsilon )
-                {
-                    // splitCut must be fully outside the face
+                        outNegative?.Clear();
+                        return false;
+                    }
 
                     if ( posFaceCut.Max - posFaceCut.Min >= DistanceEpsilon )
                     {
-                        outPositive.Clear();
-                        outNegative?.Clear();
-                        outPositive.AddRange( faceCuts );
-                        return;
+                        outPositive.Add( posFaceCut );
                     }
 
                     if ( negFaceCut.Max - negFaceCut.Min >= DistanceEpsilon )
                     {
-                        outPositive.Clear();
-                        outNegative?.Clear();
-                        outNegative?.AddRange( faceCuts );
-                        return;
+                        outNegative?.Add( negFaceCut );
                     }
-
-                    Assert.IsTrue( false );
                 }
 
-                if ( posFaceCut.Max - posFaceCut.Min >= DistanceEpsilon )
+                outPositive.Add( newCut );
+                outNegative?.Add( -newCut );
+
+                if ( outPositive.IsDegenerate() || outNegative.IsDegenerate() )
                 {
-                    outPositive.Add( posFaceCut );
+                    outNegative?.Clear();
+                    return false;
                 }
 
-                if ( negFaceCut.Max - negFaceCut.Min >= DistanceEpsilon )
-                {
-                    outNegative?.Add( negFaceCut );
-                }
-            }
+                faceCuts.Clear();
+                faceCuts.AddRange( outPositive );
 
-            outPositive.Add( newCut );
-            outNegative?.Add( -newCut );
-
-            if ( outPositive.IsDegenerate() )
-            {
-                outPositive.Clear();
-                outNegative?.Clear();
-                outNegative?.AddRange( faceCuts );
+                return true;
             }
-            else if ( outNegative.IsDegenerate() )
+            finally
             {
-                outPositive.Clear();
-                outNegative?.Clear();
-                outPositive.AddRange( faceCuts );
+                ReturnFaceCutList( outPositive );
             }
         }
     }

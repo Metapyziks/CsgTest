@@ -14,6 +14,18 @@ namespace CsgTest.Geometry
         {
             if (solid.IsEmpty) return false;
 
+            if ( op == BrushOperator.Paint )
+            {
+                // TODO
+                return false;
+            }
+
+            if ( op == BrushOperator.Replace )
+            {
+                // TODO
+                return false;
+            }
+
             var min = solid.VertexMin - CsgHelpers.DistanceEpsilon;
             var max = solid.VertexMax + CsgHelpers.DistanceEpsilon;
 
@@ -52,7 +64,7 @@ namespace CsgTest.Geometry
                     _polyhedra.Add( child );
                 }
 
-                if ( !next.IsEmpty && !solid.Contains( next.VertexAverage ) ) continue;
+                if ( !next.IsEmpty && solid.GetSign( next.VertexAverage ) < 0 ) continue;
 
                 // next will now contain only the intersection with solid.
                 // We'll copy its faces and remove it

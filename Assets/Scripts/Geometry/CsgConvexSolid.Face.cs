@@ -64,9 +64,6 @@ namespace CsgTest.Geometry
 
             public void RemoveSubFacesInside( List<FaceCut> faceCuts )
             {
-                var intersectionCuts = CsgHelpers.RentFaceCutList();
-
-                var posCuts = CsgHelpers.RentFaceCutList();
                 var negCuts = CsgHelpers.RentFaceCutList();
 
                 try
@@ -74,27 +71,13 @@ namespace CsgTest.Geometry
                     for ( var i = SubFaces.Count - 1; i >= 0; i-- )
                     {
                         var thisSubFace = SubFaces[i];
-                        var allInside = true;
-
-                        intersectionCuts.Clear();
-                        intersectionCuts.AddRange( thisSubFace.FaceCuts );
 
                         foreach ( var otherFaceCut in faceCuts )
                         {
-                            intersectionCuts.Split( otherFaceCut, posCuts, negCuts );
-
-                            if ( negCuts.Count == 0 )
+                            if ( !thisSubFace.FaceCuts.Split( otherFaceCut, negCuts ) )
                             {
                                 continue;
                             }
-
-                            if ( posCuts.Count == 0 )
-                            {
-                                allInside = false;
-                                break;
-                            }
-
-                            (intersectionCuts, posCuts) = (posCuts, intersectionCuts);
                             
                             SubFaces.Add( new SubFace
                             {
@@ -104,21 +87,14 @@ namespace CsgTest.Geometry
                             } );
                         }
                         
-                        if ( allInside && faceCuts.Contains( intersectionCuts.GetAveragePos() ) )
+                        if ( faceCuts.Contains( thisSubFace.FaceCuts.GetAveragePos() ) )
                         {
                             SubFaces.RemoveAt( i );
-                        }
-                        else
-                        {
-                            thisSubFace.FaceCuts.Clear();
-                            thisSubFace.FaceCuts.AddRange( intersectionCuts );
                         }
                     }
                 }
                 finally
                 {
-                    CsgHelpers.ReturnFaceCutList( intersectionCuts );
-                    CsgHelpers.ReturnFaceCutList( posCuts );
                     CsgHelpers.ReturnFaceCutList( negCuts );
                 }
             }
@@ -190,7 +166,15 @@ namespace CsgTest.Geometry
 
             public bool ExcludesAll => float.IsPositiveInfinity(Distance);
             public bool ExcludesNone => float.IsNegativeInfinity(Distance);
-            
+
+            public float Mid => !float.IsNegativeInfinity( Min ) && !float.IsPositiveInfinity( Max )
+                ? (Min + Max) * 0.5f
+                : !float.IsNegativeInfinity( Min )
+                    ? Min + 1f
+                    : !float.IsNegativeInfinity( Max )
+                        ? Max - 1f
+                        : 0f;
+
             public FaceCut( float2 normal, float distance, float min, float max ) => (Normal, Angle, Distance, Min, Max) = (normal, math.atan2(normal.y, normal.x), distance, min, max);
             
             public int CompareTo( FaceCut other )
