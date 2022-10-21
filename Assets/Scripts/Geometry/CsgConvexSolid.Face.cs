@@ -62,6 +62,65 @@ namespace CsgTest.Geometry
                 return copy;
             }
 
+            public void RemoveSubFacesInside( List<FaceCut> faceCuts )
+            {
+                var intersectionCuts = CsgHelpers.RentFaceCutList();
+
+                var posCuts = CsgHelpers.RentFaceCutList();
+                var negCuts = CsgHelpers.RentFaceCutList();
+
+                try
+                {
+                    for ( var i = SubFaces.Count - 1; i >= 0; i-- )
+                    {
+                        var thisSubFace = SubFaces[i];
+                        var allInside = true;
+
+                        intersectionCuts.Clear();
+                        intersectionCuts.AddRange( thisSubFace.FaceCuts );
+
+                        foreach ( var otherFaceCut in faceCuts )
+                        {
+                            intersectionCuts.Split( otherFaceCut, posCuts, negCuts );
+
+                            if ( posCuts.Count == 0 )
+                            {
+                                allInside = false;
+                                break;
+                            }
+
+                            (intersectionCuts, posCuts) = (posCuts, intersectionCuts);
+
+                            if ( negCuts.Count > 0 )
+                            {
+                                SubFaces.Add( new SubFace
+                                {
+                                    FaceCuts = new List<FaceCut>( negCuts ),
+                                    MaterialIndex = thisSubFace.MaterialIndex,
+                                    Neighbor = thisSubFace.Neighbor
+                                } );
+                            }
+                        }
+
+                        if ( allInside )
+                        {
+                            SubFaces.RemoveAt( i );
+                        }
+                        else
+                        {
+                            thisSubFace.FaceCuts.Clear();
+                            thisSubFace.FaceCuts.AddRange( intersectionCuts );
+                        }
+                    }
+                }
+                finally
+                {
+                    CsgHelpers.ReturnFaceCutList( intersectionCuts );
+                    CsgHelpers.ReturnFaceCutList( posCuts );
+                    CsgHelpers.ReturnFaceCutList( negCuts );
+                }
+            }
+
             public bool Equals( Face other )
             {
                 return Plane.Equals(other.Plane);

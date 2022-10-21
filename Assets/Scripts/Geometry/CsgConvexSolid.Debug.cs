@@ -12,8 +12,12 @@ namespace CsgTest.Geometry
     {
         public void DrawGizmos( bool drawFaces )
         {
-            foreach (var face in _faces)
+            for ( var i = 0 ; i < _faces.Count; ++i)
             {
+                // if ( i != 0 ) continue;
+
+                var face = _faces[i];
+
                 face.DrawGizmos(VertexAverage, drawFaces);
             }
 
@@ -39,9 +43,9 @@ namespace CsgTest.Geometry
         {
             private static void DrawFaceGizmos( List<FaceCut> faceCuts, in CsgPlane.Helper helper, float scale )
             {
-                var arrowGap = 16f * scale;
+                var totalLength = 0f;
 
-                var t = (-1f + DateTime.UtcNow.Millisecond / 1000f) * arrowGap;
+                faceCuts.Sort( FaceCut.Comparer );
 
                 foreach ( var cut in faceCuts )
                 {
@@ -50,6 +54,21 @@ namespace CsgTest.Geometry
 
                     Gizmos.DrawLine( min, max );
 
+                    totalLength += math.length( max - min );
+                }
+
+                scale *= Mathf.Sqrt( totalLength / 16f );
+                
+                var arrowCount = Mathf.Floor( totalLength / (16f * scale) );
+                var arrowGap = totalLength / arrowCount;
+
+                var t = (-1f + DateTime.UtcNow.Millisecond / 1000f) * arrowGap;
+
+                foreach ( var cut in faceCuts )
+                {
+                    var min = helper.GetPoint( cut, cut.Min );
+                    var max = helper.GetPoint( cut, cut.Max );
+                    
                     var tangent = math.normalizesafe( max - min );
                     var normal = math.cross( tangent, helper.Normal );
 
@@ -60,14 +79,13 @@ namespace CsgTest.Geometry
                     while ( t > 0f )
                     {
                         var mid = math.lerp( min, max, t / l );
-                        var size = math.clamp( math.min( t, l - t ), 0f, 1f ) * scale;
+                        var size = math.clamp( math.min( t, l - t ), 0f, scale );
 
                         Gizmos.DrawLine( mid + tangent * size, mid - normal * size );
                         Gizmos.DrawLine( mid, mid - normal * size );
 
                         t -= arrowGap;
                     }
-
                 }
             }
 

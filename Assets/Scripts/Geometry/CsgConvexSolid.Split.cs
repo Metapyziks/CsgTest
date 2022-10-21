@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -47,206 +48,217 @@ namespace CsgTest.Geometry
             return result.Changed;
         }
         
-        [ThreadStatic]
-        private static List<FaceCut> _sPositiveCuts;
-
-        [ThreadStatic]
-        private static List<FaceCut> _sNegativeCuts;
-
         private (bool Changed, CsgConvexSolid NegativeSolid) Split( CsgPlane cutPlane, List<FaceCut> faceCuts, bool discard )
         {
             if ( IsEmpty ) return (false, null);
-            
-            var posCuts = _sPositiveCuts ??= new List<FaceCut>();
-            var negCuts = _sNegativeCuts ??= new List<FaceCut>();
 
             var splitPlaneHelper = cutPlane.GetHelper();
 
-            var splitFace = new Face
+            var intersectionCuts = CsgHelpers.RentFaceCutList();
+
+            var posCuts = CsgHelpers.RentFaceCutList();
+            var negCuts = CsgHelpers.RentFaceCutList();
+
+            try
             {
-                Plane = cutPlane,
-                FaceCuts = new List<FaceCut>()
-            };
+                intersectionCuts.Clear();
 
-            if ( faceCuts != null )
-            {
-                splitFace.FaceCuts.AddRange( faceCuts );
-            }
-
-            // Cut down split face to see if there is any intersection
-
-            foreach ( var face in _faces )
-            {
-                var splitPlaneCut = splitPlaneHelper.GetCut( face.Plane );
-                splitFace.FaceCuts.Split( splitPlaneCut, posCuts, negCuts );
-
-                if ( negCuts.Count == 0 )
+                if ( faceCuts != null )
                 {
-                    continue;
+                    intersectionCuts.AddRange( faceCuts );
                 }
 
-                if ( posCuts.Count == 0 )
+                // Cut down split face to see if there is any intersection
+
+                foreach ( var face in _faces )
                 {
-                    // Bounded cut plane is fully outside of this solid
-
-                    return (false, null);
-                }
-
-                splitFace.FaceCuts.Clear();
-                splitFace.FaceCuts.AddRange( posCuts );
-            }
-
-            // If we survived that, the cut plane must intersect this solid
-
-            var negSolid = discard
-                ? null
-                : new CsgConvexSolid
-                {
-                    MaterialIndex = MaterialIndex
-                };
-
-            for ( var i = _faces.Count - 1; i >= 0; i-- )
-            {
-                var face = _faces[i];
-                var facePlaneHelper = face.Plane.GetHelper();
-                var facePlaneCut = facePlaneHelper.GetCut( cutPlane );
-                
-                face.FaceCuts.Split( facePlaneCut, posCuts, negCuts );
-
-                // Check if face is all on positive or negative side
-
-                if ( negCuts.Count == 0 )
-                {
-                    continue;
-                }
-
-                if ( posCuts.Count == 0 )
-                {
-                    _faces.RemoveAt( i );
-                    negSolid?._faces.Add( face );
-                    continue;
-                }
-
-                // Otherwise split face in two
-
-                var posFace = new Face
-                {
-                    Plane = face.Plane,
-                    FaceCuts = new List<FaceCut>( posCuts ),
-                    SubFaces = new List<SubFace>()
-                };
-
-                var negFace = discard ? (Face?) null : new Face
-                {
-                    Plane = face.Plane,
-                    FaceCuts = new List<FaceCut>( negCuts ),
-                    SubFaces = new List<SubFace>()
-                };
-
-                _faces[i] = posFace;
-                negSolid?._faces.Add( negFace.Value );
-
-                foreach ( var subFace in face.SubFaces )
-                {
-                    subFace.FaceCuts.Split( facePlaneCut, posCuts, negCuts );
-
-                    // Check if sub-face is all on positive or negative side
+                    var splitPlaneCut = splitPlaneHelper.GetCut( face.Plane );
+                    intersectionCuts.Split( splitPlaneCut, posCuts, negCuts );
 
                     if ( negCuts.Count == 0 )
                     {
-                        posFace.SubFaces.Add( subFace );
                         continue;
                     }
 
                     if ( posCuts.Count == 0 )
                     {
-                        negFace?.SubFaces.Add( subFace );
+                        // Bounded cut plane is fully outside of this solid
+
+                        return (false, null);
+                    }
+
+                    (intersectionCuts, posCuts) = (posCuts, intersectionCuts);
+                }
+
+                // If we survived that, the cut plane must intersect this solid
+
+                var negSolid = discard
+                    ? null
+                    : new CsgConvexSolid
+                    {
+                        MaterialIndex = MaterialIndex
+                    };
+
+                var posSubFace = new SubFace
+                {
+                    FaceCuts = new List<FaceCut>( intersectionCuts ),
+                    Neighbor = negSolid
+                };
+
+                if ( faceCuts != null )
+                {
+                    intersectionCuts.Clear();
+                }
+
+                for ( var i = _faces.Count - 1; i >= 0; i-- )
+                {
+                    var face = _faces[i];
+
+                    if ( faceCuts != null )
+                    {
+                        // Cut unbounded split plane to find split face.
+                        // If faceCuts == null, we've already found it (posSubFace will be the whole face)
+
+                        var splitPlaneCut = splitPlaneHelper.GetCut( face.Plane );
+                        intersectionCuts.Split( splitPlaneCut, posCuts, negCuts );
+
+                        if ( negCuts.Count != 0 )
+                        {
+                            Assert.IsFalse( posCuts.Count == 0 );
+
+                            (intersectionCuts, posCuts) = (posCuts, intersectionCuts);
+                        }
+                    }
+
+                    // Cut original face
+
+                    var facePlaneHelper = face.Plane.GetHelper();
+                    var facePlaneCut = facePlaneHelper.GetCut( cutPlane );
+
+                    face.FaceCuts.Split( facePlaneCut, posCuts, negCuts );
+
+                    // Check if face is all on positive or negative side
+
+                    if ( negCuts.Count == 0 )
+                    {
                         continue;
                     }
 
-                    // Otherwise split sub-face in two
-
-                    posFace.SubFaces.Add( new SubFace
+                    if ( posCuts.Count == 0 )
                     {
+                        _faces.RemoveAt( i );
+                        negSolid?._faces.Add( face );
+                        continue;
+                    }
+
+                    // Otherwise split face in two
+
+                    var posFace = new Face
+                    {
+                        Plane = face.Plane,
                         FaceCuts = new List<FaceCut>( posCuts ),
-                        MaterialIndex = subFace.MaterialIndex,
-                        Neighbor = subFace.Neighbor
-                    } );
+                        SubFaces = new List<SubFace>()
+                    };
 
-                    negFace?.SubFaces.Add( new SubFace
+                    var negFace = discard
+                        ? (Face?)null
+                        : new Face
+                        {
+                            Plane = face.Plane,
+                            FaceCuts = new List<FaceCut>( negCuts ),
+                            SubFaces = new List<SubFace>()
+                        };
+
+                    _faces[i] = posFace;
+                    negSolid?._faces.Add( negFace.Value );
+
+                    foreach ( var subFace in face.SubFaces )
                     {
-                        FaceCuts = new List<FaceCut>( negCuts ),
-                        MaterialIndex = subFace.MaterialIndex,
-                        Neighbor = subFace.Neighbor
-                    } );
+                        subFace.FaceCuts.Split( facePlaneCut, posCuts, negCuts );
+
+                        // Check if sub-face is all on positive or negative side
+
+                        if ( negCuts.Count == 0 )
+                        {
+                            posFace.SubFaces.Add( subFace );
+                            continue;
+                        }
+
+                        if ( posCuts.Count == 0 )
+                        {
+                            negFace?.SubFaces.Add( subFace );
+                            continue;
+                        }
+
+                        // Otherwise split sub-face in two
+
+                        posFace.SubFaces.Add( new SubFace
+                        {
+                            FaceCuts = new List<FaceCut>( posCuts ),
+                            MaterialIndex = subFace.MaterialIndex,
+                            Neighbor = subFace.Neighbor
+                        } );
+
+                        negFace?.SubFaces.Add( new SubFace
+                        {
+                            FaceCuts = new List<FaceCut>( negCuts ),
+                            MaterialIndex = subFace.MaterialIndex,
+                            Neighbor = subFace.Neighbor
+                        } );
+                    }
                 }
-            }
-            
-            splitFace.SubFaces = new List<SubFace>
-            {
-                new SubFace
+
+                var posSplitFace = new Face
                 {
-                    FaceCuts = new List<FaceCut>( splitFace.FaceCuts ),
-                    Neighbor = negSolid
+                    Plane = cutPlane,
+                    FaceCuts = new List<FaceCut>( intersectionCuts )
+                };
+
+                posSplitFace.SubFaces = new List<SubFace>
+                {
+                    new SubFace
+                    {
+                        FaceCuts = new List<FaceCut>( posSplitFace.FaceCuts ),
+                        Neighbor = negSolid
+                    }
+                };
+
+                if ( faceCuts != null )
+                {
+                    // If cut was already constrained, add the constrained sub-face
+
+                    posSplitFace.RemoveSubFacesInside( posSubFace.FaceCuts );
+                    posSplitFace.SubFaces.Add( posSubFace );
                 }
-            };
 
-            _faces.Add( splitFace );
-            negSolid?._faces.Add( splitFace.CloneFlipped( this ) );
+                _faces.Add( posSplitFace );
+                negSolid?._faces.Add( posSplitFace.CloneFlipped( this ) );
 
-            return (true, negSolid);
+                return (true, negSolid);
+            }
+            finally
+            {
+                CsgHelpers.ReturnFaceCutList( intersectionCuts );
+                CsgHelpers.ReturnFaceCutList( posCuts );
+                CsgHelpers.ReturnFaceCutList( negCuts );
+            }
         }
         
         /// <summary>
-        /// Merge sub-faces from another solid that is entirely contained within this one.
+        /// Merge sub-faces from another solid.
         /// </summary>
         public void MergeSubFacesFrom( CsgConvexSolid other )
         {
             if ( other.IsEmpty || IsEmpty ) return;
-
-            var posCuts = _sPositiveCuts ??= new List<FaceCut>();
-            var negCuts = _sNegativeCuts ??= new List<FaceCut>();
-
+            
             foreach ( var thisFace in _faces )
             {
                 if ( !other.TryGetFace( thisFace.Plane, out var otherFace ) )
                 {
                     continue;
                 }
-
-                // First remove all sub-faces that overlap
-
-                for ( var i = thisFace.SubFaces.Count - 1; i >= 0; i-- )
-                {
-                    var thisSubFace = thisFace.SubFaces[i];
-                    var allInside = true;
-
-                    foreach ( var otherFaceCut in otherFace.FaceCuts )
-                    {
-                        thisSubFace.FaceCuts.Split( otherFaceCut, posCuts, negCuts );
-
-                        if ( posCuts.Count == 0 )
-                        {
-                            allInside = false;
-                            break;
-                        }
-
-                        thisSubFace.FaceCuts.Clear();
-                        thisSubFace.FaceCuts.AddRange( posCuts );
-
-                        thisFace.SubFaces.Add( new SubFace
-                        {
-                            FaceCuts = new List<FaceCut>( negCuts ),
-                            MaterialIndex = thisSubFace.MaterialIndex,
-                            Neighbor = thisSubFace.Neighbor
-                        } );
-                    }
-
-                    if ( allInside )
-                    {
-                        thisFace.SubFaces.RemoveAt( i );
-                    }
-                }
+                
+                thisFace.RemoveSubFacesInside( otherFace.FaceCuts );
 
                 // Now just add the sub-faces from other
 
