@@ -83,6 +83,11 @@ namespace CsgTest.Geometry
                         {
                             intersectionCuts.Split( otherFaceCut, posCuts, negCuts );
 
+                            if ( negCuts.Count == 0 )
+                            {
+                                continue;
+                            }
+
                             if ( posCuts.Count == 0 )
                             {
                                 allInside = false;
@@ -90,19 +95,16 @@ namespace CsgTest.Geometry
                             }
 
                             (intersectionCuts, posCuts) = (posCuts, intersectionCuts);
-
-                            if ( negCuts.Count > 0 )
+                            
+                            SubFaces.Add( new SubFace
                             {
-                                SubFaces.Add( new SubFace
-                                {
-                                    FaceCuts = new List<FaceCut>( negCuts ),
-                                    MaterialIndex = thisSubFace.MaterialIndex,
-                                    Neighbor = thisSubFace.Neighbor
-                                } );
-                            }
+                                FaceCuts = new List<FaceCut>( negCuts ),
+                                MaterialIndex = thisSubFace.MaterialIndex,
+                                Neighbor = thisSubFace.Neighbor
+                            } );
                         }
-
-                        if ( allInside )
+                        
+                        if ( allInside && faceCuts.Contains( intersectionCuts.GetAveragePos() ) )
                         {
                             SubFaces.RemoveAt( i );
                         }
@@ -188,12 +190,17 @@ namespace CsgTest.Geometry
 
             public bool ExcludesAll => float.IsPositiveInfinity(Distance);
             public bool ExcludesNone => float.IsNegativeInfinity(Distance);
-
+            
             public FaceCut( float2 normal, float distance, float min, float max ) => (Normal, Angle, Distance, Min, Max) = (normal, math.atan2(normal.y, normal.x), distance, min, max);
             
             public int CompareTo( FaceCut other )
             {
                 return Angle.CompareTo(other.Angle);
+            }
+
+            public float2 GetPos( float along )
+            {
+                return Normal * Distance + new float2( -Normal.y, Normal.x ) * along;
             }
 
             public override string ToString()

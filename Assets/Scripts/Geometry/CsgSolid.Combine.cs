@@ -60,6 +60,7 @@ namespace CsgTest.Geometry
                 _polyhedra.RemoveAt( polyIndex );
 
                 solid.MergeSubFacesFrom( next );
+                next.Remove( null );
             }
 
             if ( op == BrushOperator.Add )
@@ -68,7 +69,7 @@ namespace CsgTest.Geometry
             }
             else
             {
-                solid.RemoveFromNeighbors( null );
+                solid.Remove( null );
             }
 
             _meshInvalid |= changed;

@@ -107,6 +107,35 @@ namespace CsgTest.Geometry
             return faceCuts.Count < 3;
         }
 
+        public static bool Contains( this List<CsgConvexSolid.FaceCut> faceCuts, float2 pos )
+        {
+            foreach ( var faceCut in faceCuts )
+            {
+                if ( math.dot( faceCut.Normal, pos ) - faceCut.Distance < -DistanceEpsilon )
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        public static float2 GetAveragePos( this List<CsgConvexSolid.FaceCut> faceCuts )
+        {
+            Assert.IsTrue( faceCuts.Count >= 3 );
+
+            var avgPos = float2.zero;
+
+            foreach ( var faceCut in faceCuts )
+            {
+                Assert.IsFalse( float.IsNegativeInfinity( faceCut.Min ) );
+
+                avgPos += faceCut.GetPos( faceCut.Min );
+            }
+
+            return avgPos / faceCuts.Count;
+        }
+
         public static void Split( this List<CsgConvexSolid.FaceCut> faceCuts, CsgConvexSolid.FaceCut splitCut,
             List<CsgConvexSolid.FaceCut> outPositive, List<CsgConvexSolid.FaceCut> outNegative = null )
         {

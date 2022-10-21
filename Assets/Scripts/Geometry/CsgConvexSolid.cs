@@ -95,16 +95,6 @@ namespace CsgTest.Geometry
             return copy;
         }
 
-        private void SetEmpty()
-        {
-            RemoveFromNeighbors( null );
-
-            _faces.Clear();
-            IsEmpty = true;
-
-            InvalidateMesh();
-        }
-
         public bool Contains( float3 pos )
         {
             if ( IsEmpty ) return false;

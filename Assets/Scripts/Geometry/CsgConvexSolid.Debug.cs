@@ -41,7 +41,7 @@ namespace CsgTest.Geometry
 
         partial struct Face
         {
-            private static void DrawFaceGizmos( List<FaceCut> faceCuts, in CsgPlane.Helper helper, float scale, CsgConvexSolid neighbor = null )
+            private static float3 DrawFaceGizmos( List<FaceCut> faceCuts, in CsgPlane.Helper helper, float scale )
             {
                 var totalLength = 0f;
 
@@ -62,11 +62,6 @@ namespace CsgTest.Geometry
                 }
 
                 avgPos /= faceCuts.Count;
-
-                if ( neighbor != null )
-                {
-                    Gizmos.DrawLine( avgPos, neighbor.VertexAverage );
-                }
 
                 scale *= Mathf.Sqrt( totalLength / 16f );
                 
@@ -92,7 +87,7 @@ namespace CsgTest.Geometry
                     while ( t > 0f )
                     {
                         var mid = math.lerp( min, max, t / l );
-                        var size = math.clamp( math.min( t, l - t ), 0f, scale );
+                        var size = math.clamp( math.min( t, l - t ), 0f, 1f ) * scale;
 
                         Gizmos.DrawLine( mid + tangent * size, mid - normal * size );
                         Gizmos.DrawLine( mid, mid - normal * size );
@@ -100,6 +95,8 @@ namespace CsgTest.Geometry
                         t -= arrowGap;
                     }
                 }
+
+                return avgPos;
             }
 
             public void DrawGizmos( float3 vertexAverage, bool drawFaces )
@@ -118,8 +115,15 @@ namespace CsgTest.Geometry
                 {
                     if (drawFaces)
                     {
-                        Gizmos.color = new Color( 0f, 1f, 0f, 0.5f );
-                        DrawFaceGizmos( subFace.FaceCuts, basis, 0.5f, subFace.Neighbor );
+                        Gizmos.color = new Color( 0f, 1f, 0f );
+
+                        var avgPos = DrawFaceGizmos( subFace.FaceCuts, basis, 0.5f );
+
+                        if ( subFace.Neighbor != null )
+                        {
+                            Gizmos.color = subFace.Neighbor.IsEmpty ? Color.red : Color.yellow;
+                            Gizmos.DrawLine( avgPos, subFace.Neighbor.VertexAverage );
+                        }
                     }
                 }
             }

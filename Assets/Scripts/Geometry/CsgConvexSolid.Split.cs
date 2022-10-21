@@ -255,7 +255,7 @@ namespace CsgTest.Geometry
             }
         }
 
-        public void RemoveFromNeighbors( CsgConvexSolid replacement )
+        public void Remove( CsgConvexSolid replacement )
         {
             foreach ( var face in _faces )
             {
@@ -264,6 +264,11 @@ namespace CsgTest.Geometry
                     subFace.Neighbor?.ReplaceNeighbor( -face.Plane, this, replacement );
                 }
             }
+
+            _faces.Clear();
+            IsEmpty = true;
+
+            InvalidateMesh();
         }
 
         private void ReplaceNeighbor( CsgPlane plane, CsgConvexSolid oldNeighbor, CsgConvexSolid newNeighbor )
@@ -337,7 +342,7 @@ namespace CsgTest.Geometry
         public void MergeSubFacesFrom( CsgConvexSolid other )
         {
             if ( other.IsEmpty || IsEmpty ) return;
-            
+
             foreach ( var thisFace in _faces )
             {
                 if ( !other.TryGetFace( thisFace.Plane, out var otherFace ) )
