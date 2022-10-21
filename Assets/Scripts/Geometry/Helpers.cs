@@ -55,7 +55,7 @@ namespace CsgTest.Geometry
         {
             for ( var i = 0; i < faceCuts.Count; i++ )
             {
-                faceCuts[i] = oldHelper.Transform( faceCuts[i], newHelper );
+                faceCuts[i] = -oldHelper.Transform( faceCuts[i], newHelper );
             }
         }
 
