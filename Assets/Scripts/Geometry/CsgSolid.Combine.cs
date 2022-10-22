@@ -13,15 +13,11 @@ namespace CsgTest.Geometry
         public bool Combine( CsgConvexSolid solid, BrushOperator op )
         {
             if (solid.IsEmpty) return false;
-
-            if ( op == BrushOperator.Paint )
-            {
-                // TODO
-                return false;
-            }
-
+            
             var min = solid.VertexMin - CsgHelpers.DistanceEpsilon;
             var max = solid.VertexMax + CsgHelpers.DistanceEpsilon;
+
+            var faces = solid.Faces;
 
             var changed = false;
             
@@ -46,13 +42,17 @@ namespace CsgTest.Geometry
                 switch ( op )
                 {
                     case BrushOperator.Replace:
+                        next.Paint( solid, null );
                         skip = next.MaterialIndex == solid.MaterialIndex;
+                        break;
+
+                    case BrushOperator.Paint:
+                        next.Paint( solid, solid.MaterialIndex );
+                        skip = true;
                         break;
                 }
 
                 if ( skip ) continue;
-
-                var faces = solid.Faces;
 
                 for ( var faceIndex = 0; faceIndex < faces.Count && !next.IsEmpty; ++faceIndex )
                 {
