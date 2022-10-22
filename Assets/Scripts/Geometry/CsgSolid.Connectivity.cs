@@ -26,14 +26,14 @@ namespace CsgTest.Geometry
 
     partial class CsgSolid
     {
-        [ThreadStatic] private static List<(CsgConvexSolid, float)> _sChunks;
+        [ThreadStatic] private static List<(CsgConvexSolid, int, float)> _sChunks;
         [ThreadStatic] private static HashSet<CsgConvexSolid> _sVisited;
         [ThreadStatic] private static Queue<CsgConvexSolid> _sVisitQueue;
 
-        private static void GetConnectivityContainers( out List<(CsgConvexSolid Root, float Volume)> chunks,
+        private static void GetConnectivityContainers( out List<(CsgConvexSolid Root, int Count, float Volume)> chunks,
             out HashSet<CsgConvexSolid> visited, out Queue<CsgConvexSolid> queue )
         {
-            chunks = _sChunks ??= new List<(CsgConvexSolid, float)>();
+            chunks = _sChunks ??= new List<(CsgConvexSolid, int, float)>();
             visited = _sVisited ??= new HashSet<CsgConvexSolid>();
             queue = _sVisitQueue ??= new Queue<CsgConvexSolid>();
 
@@ -42,7 +42,7 @@ namespace CsgTest.Geometry
             queue.Clear();
         }
 
-        private void FindChunks( List<(CsgConvexSolid Root, float Volume)> chunks, HashSet<CsgConvexSolid> visited, Queue<CsgConvexSolid> queue )
+        private void FindChunks( List<(CsgConvexSolid Root, int Count, float Volume)> chunks, HashSet<CsgConvexSolid> visited, Queue<CsgConvexSolid> queue )
         {
             while ( visited.Count < _polyhedra.Count )
             {
@@ -76,7 +76,7 @@ namespace CsgTest.Geometry
                     next.AddNeighbors( visited, queue );
                 }
 
-                chunks.Add( (root, volume) );
+                chunks.Add( (root, count, volume) );
             }
         }
 

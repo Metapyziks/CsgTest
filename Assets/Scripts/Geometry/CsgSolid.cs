@@ -101,9 +101,9 @@ namespace CsgTest.Geometry
                         poly.Transform(matrix);
                     }
 
-                    //SubdivideGridAxis(new float3(1f, 0f, 0f), polys);
-                    //SubdivideGridAxis(new float3(0f, 0f, 1f), polys);
-                    //SubdivideGridAxis(new float3(0f, 1f, 0f), polys);
+                    SubdivideGridAxis( new float3( 1f, 0f, 0f ), polys );
+                    SubdivideGridAxis( new float3( 0f, 0f, 1f ), polys );
+                    SubdivideGridAxis( new float3( 0f, 1f, 0f ), polys );
 
                     foreach (var poly in polys)
                     {
