@@ -44,6 +44,7 @@ namespace CsgTest
         public float SubtractSize = 2.5f;
 
         private float _lastShotTime;
+        private bool _wasLocked = false;
 
         void Start()
         {
@@ -104,7 +105,12 @@ namespace CsgTest
                 ThrowFlare();
             }
 
-            if (Cursor.lockState == CursorLockMode.Locked)
+            if ( !Input.GetMouseButton( 0 ) )
+            {
+                _wasLocked = Cursor.lockState == CursorLockMode.Locked;
+            }
+
+            if ( _wasLocked )
             {
                 var look = new float2(Input.GetAxisRaw("Mouse X"), Input.GetAxisRaw("Mouse Y")) * MouseSensitivity;
                 var pitch = _eyes.localEulerAngles.x;
