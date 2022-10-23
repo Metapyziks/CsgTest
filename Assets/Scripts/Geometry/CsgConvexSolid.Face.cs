@@ -13,6 +13,22 @@ namespace CsgTest.Geometry
             public List<FaceCut> FaceCuts;
             public List<SubFace> SubFaces;
 
+            public bool HasOpenSubFaces
+            {
+                get
+                {
+                    foreach ( var subFace in SubFaces )
+                    {
+                        if ( subFace.Neighbor == null )
+                        {
+                            return true;
+                        }
+                    }
+
+                    return false;
+                }
+            }
+
             public override string ToString()
             {
                 return $"{{ Plane: {Plane}, FaceCuts: {FaceCuts?.Count} }}";

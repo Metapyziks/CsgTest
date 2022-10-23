@@ -98,8 +98,8 @@ namespace CsgTest.Geometry
 
             foreach ( var cut in faceCuts )
             {
-                if ( float.IsNegativeInfinity( cut.Min ) ) return false;
-                if ( float.IsPositiveInfinity( cut.Max ) ) return false;
+                if ( float.IsInfinity( cut.Min ) ) return false;
+                if ( float.IsInfinity( cut.Max ) ) return false;
             }
 
             return faceCuts.Count < 3;

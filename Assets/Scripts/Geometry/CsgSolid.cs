@@ -105,9 +105,9 @@ namespace CsgTest.Geometry
                     SubdivideGridAxis( new float3( 0f, 0f, 1f ), polys );
                     SubdivideGridAxis( new float3( 0f, 1f, 0f ), polys );
 
-                    foreach (var poly in polys)
+                    foreach ( var poly in polys )
                     {
-                        Combine(poly, brush.Operator);
+                        Combine( poly, brush.Operator );
                     }
                 }
 
